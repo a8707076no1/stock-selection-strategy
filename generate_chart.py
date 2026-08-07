@@ -2441,6 +2441,8 @@ canvas {{ width: 100% !important; }}
 </style>
 </head>
 <body>
+<!-- PWA 回首頁按鈕（在 PWA App 開啟時顯示） -->
+<a href="/" style="position:fixed;top:calc(env(safe-area-inset-top) + 8px);left:12px;z-index:99999;background:rgba(13,20,36,0.92);color:#f0c040;padding:9px 16px;border-radius:22px;text-decoration:none;font-size:14px;font-weight:bold;border:1px solid rgba(240,196,64,0.4);box-shadow:0 4px 12px rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">← 回首頁</a>
 <div class="header">
   <h1>📈 台股飆股選股日報　{today_str}</h1>
   <div class="summary-badges">
