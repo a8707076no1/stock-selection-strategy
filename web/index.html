@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<title>📈 台股飆股每日</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1424">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="飆股">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: linear-gradient(180deg, #0d1424 0%, #1a1f2e 100%);
+    color: #e0e6f0;
+    font-family: -apple-system, "SF Pro Display", "Noto Sans TC", sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    padding: 18px 20px 12px;
+    text-align: center;
+    background: rgba(0,0,0,0.35);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    position: sticky; top: 0; z-index: 10;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  h1 { font-size: 19px; margin: 0; font-weight: bold; color: #f0c040; }
+  .date-picker {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; margin-top: 8px;
+  }
+  select {
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .status-banner {
+    padding: 8px 20px;
+    background: rgba(63,185,80,0.1);
+    border-bottom: 1px solid rgba(63,185,80,0.2);
+    font-size: 11px;
+    color: #3fb950;
+    text-align: center;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 16px;
+  }
+  .tile {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-left: 4px solid var(--accent);
+    border-radius: 14px;
+    padding: 16px 14px;
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 110px;
+    transition: transform 0.15s, background 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .tile:active { transform: scale(0.96); background: rgba(255,255,255,0.08); }
+  .tile .icon { font-size: 26px; margin-bottom: 4px; }
+  .tile .title { font-size: 15px; font-weight: bold; color: #fff; }
+  .tile .sub   { font-size: 11px; color: #8b949e; margin-top: 3px; }
+  .tile .badge {
+    position: absolute; top: 10px; right: 10px;
+    padding: 2px 7px; border-radius: 10px;
+    background: rgba(255,255,255,0.12); color: #fff;
+    font-size: 10px; font-weight: bold;
+  }
+
+  /* accent 顏色 */
+  .tile.holdings   { --accent: #f0c040; }
+  .tile.v42        { --accent: #ffaadd; }
+  .tile.breakouts  { --accent: #56d364; }
+  .tile.pullbacks  { --accent: #4a9ede; }
+  .tile.merger     { --accent: #ffaa00; }
+  .tile.sector     { --accent: #aaddff; }
+
+  .section-divider {
+    padding: 16px 20px 4px;
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .full-chart-btn {
+    display: block;
+    margin: 4px 16px 16px;
+    padding: 14px;
+    background: rgba(88,166,255,0.1);
+    border: 1px solid rgba(88,166,255,0.3);
+    border-radius: 12px;
+    text-decoration: none;
+    color: #58a6ff;
+    text-align: center;
+    font-size: 13px;
+    font-weight: bold;
+  }
+  .full-chart-btn:active { background: rgba(88,166,255,0.2); }
+
+  .external-list {
+    padding: 0 16px 16px;
+  }
+  .external-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    text-decoration: none;
+    color: inherit;
+  }
+  .external-item:active { background: rgba(255,255,255,0.08); }
+  .external-item .icon { font-size: 20px; margin-right: 12px; }
+  .external-item .info { flex: 1; }
+  .external-item .title { font-size: 13px; font-weight: bold; color: #fff; }
+  .external-item .sub { font-size: 10px; color: #8b949e; margin-top: 2px; }
+  .external-item .arrow { color: #58a6ff; font-size: 18px; }
+
+  footer { text-align:center; padding: 16px 20px 30px; font-size: 10px; color: #6b7280; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📈 台股飆股每日</h1>
+  <div class="date-picker">
+    <label style="font-size:12px;color:#8b949e">選擇日期</label>
+    <select id="datePicker" onchange="switchDate()"></select>
+  </div>
+</header>
+
+<div class="status-banner" id="statusBanner">
+  🟢 雲端排程運作中（GitHub Actions）
+</div>
+
+<div class="section-divider">📊 選擇主題</div>
+
+<div class="grid" id="tileGrid"></div>
+
+<a href="#" class="full-chart-btn" id="fullChartBtn">📄 開啟完整長版報告</a>
+
+<div class="section-divider">📡 即時分析</div>
+
+<div class="external-list">
+  <a class="external-item" href="https://t.me/my_finance978_bot" target="_blank">
+    <div class="icon">💬</div>
+    <div class="info">
+      <div class="title">Telegram 飆股 Bot</div>
+      <div class="sub">/chart /assets /portfolio 等指令</div>
+    </div>
+    <div class="arrow">›</div>
+  </a>
+  <a class="external-item" href="https://www.tradingview.com/chart/?symbol=TSE%3A285A&interval=1" target="_blank">
+    <div class="icon">🇯🇵</div>
+    <div class="info">
+      <div class="title">鎧俠 Kioxia 1 分 K</div>
+      <div class="sub">台股記憶體早盤領先指標</div>
+    </div>
+    <div class="arrow">›</div>
+  </a>
+</div>
+
+<footer>© 2026 · Cloudflare Pages + GitHub Actions</footer>
+
+<script>
+// ─── 主題 tiles ───
+const THEMES = [
+  { key: "holdings",  anchor: "holdings-grid",  icon: "📊", title: "我的持股",   sub: "P/L + 券商目標價 + MA 分析" },
+  { key: "v42",       anchor: "flash-grid",     icon: "🌟", title: "V42 飆股",   sub: "族群輪動雙過濾" },
+  { key: "breakouts", anchor: "breakouts-grid", icon: "⚡",  title: "即將突破",   sub: "壓力突破候選" },
+  { key: "pullbacks", anchor: "pullbacks-grid", icon: "🎯", title: "拉回月線",   sub: "月線支撐買點" },
+  { key: "merger",    anchor: "merger-grid",    icon: "🤝", title: "併購案",     sub: "M&A 新聞監測" },
+  { key: "sector",    anchor: "sector-rotation", icon: "🏭", title: "族群輪動",   sub: "46 子族群 + 資金階段" },
+];
+
+// ─── 日期偵測 ───
+async function detectDates() {
+  const dates = [];
+  const today = new Date();
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(today.getTime() - i * 86400000);
+    if (d.getDay() === 0 || d.getDay() === 6) continue;
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const dd = String(d.getDate()).padStart(2,"0");
+    dates.push(`${y}${m}${dd}`);
+    if (dates.length >= 10) break;
+  }
+  const exists = [];
+  for (const ymd of dates) {
+    try {
+      const r = await fetch(`/飆股圖表_${ymd}.html`, { method: "HEAD" });
+      if (r.ok) exists.push(ymd);
+    } catch {}
+    if (exists.length >= 7) break;
+  }
+  return exists;
+}
+
+function displayDate(ymd) {
+  const y = ymd.slice(0,4), m = ymd.slice(4,6), d = ymd.slice(6,8);
+  const dt = new Date(`${y}-${m}-${d}`);
+  const dow = ["日","一","二","三","四","五","六"][dt.getDay()];
+  return `${m}/${d}（週${dow}）`;
+}
+
+let currentDate = null;
+
+function switchDate() {
+  currentDate = document.getElementById("datePicker").value;
+  renderTiles();
+}
+
+function renderTiles() {
+  const grid = document.getElementById("tileGrid");
+  const btn = document.getElementById("fullChartBtn");
+  if (!currentDate) {
+    grid.innerHTML = `<div style="grid-column:1/-1;color:#8b949e;text-align:center;padding:40px 20px">
+      尚無資料<br><br>雲端排程今晚 15:40 開始運作
+    </div>`;
+    btn.style.display = "none";
+    return;
+  }
+  const dateLabel = displayDate(currentDate);
+  grid.innerHTML = THEMES.map(t => {
+    const url = t.anchor ? `/飆股圖表_${currentDate}.html#${t.anchor}` : `/飆股圖表_${currentDate}.html`;
+    return `<a class="tile ${t.key}" href="${url}">
+      <div>
+        <div class="icon">${t.icon}</div>
+        <div class="title">${t.title}</div>
+        <div class="sub">${t.sub}</div>
+      </div>
+      <div class="badge">${dateLabel.slice(0,5)}</div>
+    </a>`;
+  }).join("");
+  btn.href = `/飆股圖表_${currentDate}.html`;
+  btn.style.display = "block";
+}
+
+// ─── init ───
+(async () => {
+  const dates = await detectDates();
+  const picker = document.getElementById("datePicker");
+  if (!dates.length) {
+    picker.innerHTML = `<option value="">尚無資料</option>`;
+    renderTiles();
+    return;
+  }
+  picker.innerHTML = dates.map((d, i) =>
+    `<option value="${d}"${i === 0 ? ' selected' : ''}>${displayDate(d)}${i === 0 ? ' · 今日' : ''}</option>`
+  ).join("");
+  currentDate = dates[0];
+  renderTiles();
+})();
+
+// PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+</script>
+
+</body>
+</html>

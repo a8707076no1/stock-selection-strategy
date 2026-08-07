@@ -2441,8 +2441,50 @@ canvas {{ width: 100% !important; }}
 </style>
 </head>
 <body>
-<!-- PWA 回首頁按鈕（在 PWA App 開啟時顯示） -->
+<!-- PWA 回首頁按鈕 -->
 <a href="/" style="position:fixed;top:calc(env(safe-area-inset-top) + 8px);left:12px;z-index:99999;background:rgba(13,20,36,0.92);color:#f0c040;padding:9px 16px;border-radius:22px;text-decoration:none;font-size:14px;font-weight:bold;border:1px solid rgba(240,196,64,0.4);box-shadow:0 4px 12px rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">← 回首頁</a>
+<script>
+// PWA section filter：hash 指定時只顯示該 section（避免上下滑到其他區塊）
+(function(){{
+  const HEADER_KWS = {{
+    "即將突破":"breakouts-grid",
+    "拉回月線":"pullbacks-grid",
+    "子族群輪動":"sector-rotation",
+    "V42 飆股":"flash-grid",
+    "我的持股":"holdings-grid",
+    "併購/收購":"merger-grid"
+  }};
+  const KEEP_CLASS = new Set(['header','controls','tooltip']);
+  function apply(){{
+    const hash = (location.hash || '').replace('#','');
+    if (!hash) return;
+    for (const el of Array.from(document.body.children)) {{
+      const tag = el.tagName;
+      if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'A') continue;
+      if (el.className && Array.from(el.classList).some(c => KEEP_CLASS.has(c))) continue;
+      let sec = null;
+      if (el.id === 'grid') sec = 'top-flash';
+      else if (el.id) sec = el.id;
+      else {{
+        const h2 = el.querySelector && el.querySelector('h2');
+        if (h2) {{
+          for (const [kw, key] of Object.entries(HEADER_KWS)) {{
+            if (h2.textContent.includes(kw)) {{ sec = key; break; }}
+          }}
+        }}
+      }}
+      if (sec) el.dataset.section = sec;
+    }}
+    document.body.querySelectorAll('[data-section]').forEach(el => {{
+      if (el.dataset.section !== hash) el.style.display = 'none';
+    }});
+    document.querySelectorAll('.header, .controls').forEach(el => el.style.display = 'none');
+  }}
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
+  else apply();
+  window.addEventListener('hashchange', () => location.reload());
+}})();
+</script>
 <div class="header">
   <h1>📈 台股飆股選股日報　{today_str}</h1>
   <div class="summary-badges">
