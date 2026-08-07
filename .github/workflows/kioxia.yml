@@ -1,0 +1,36 @@
+name: Kioxia Leader Indicator (09:00 TW)
+
+on:
+  schedule:
+    # 01:00 UTC = 09:00 TW；週一~五
+    - cron: '0 1 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      STOCK_TG_TOKEN: ${{ secrets.STOCK_TG_TOKEN }}
+      STOCK_TG_CHAT:  ${{ secrets.STOCK_TG_CHAT }}
+      STOCK_TG_CHAT_EXTRA: ${{ secrets.STOCK_TG_CHAT_EXTRA }}
+      STOCK_BASE_DIR: ${{ github.workspace }}
+      TZ: Asia/Taipei
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install deps
+        run: |
+          pip install --upgrade pip
+          pip install requests yfinance pandas
+
+      - name: Run Kioxia analyzer
+        run: |
+          mkdir -p logs cache
+          python kioxia_leader.py

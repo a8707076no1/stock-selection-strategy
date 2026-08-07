@@ -1,0 +1,14 @@
+# 核心依賴（所有 workflow 都需要）
+requests>=2.31
+pandas>=2.0
+numpy>=1.24
+openpyxl>=3.1
+
+# yahoo finance（daily_chart、kioxia、us_premarket）
+yfinance>=0.2.40
+
+# YouTube 抓取（lin_hanwei）
+yt-dlp>=2024.1.1
+
+# Whisper 轉錄（lin_hanwei）
+faster-whisper>=1.0

@@ -1,0 +1,44 @@
+name: US Premarket Analysis (06:00 TW)
+
+on:
+  schedule:
+    # 22:00 UTC = 06:00 TW（隔天）
+    - cron: '0 22 * * *'
+  workflow_dispatch:  # 允許手動觸發
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      STOCK_TG_TOKEN: ${{ secrets.STOCK_TG_TOKEN }}
+      STOCK_TG_CHAT:  ${{ secrets.STOCK_TG_CHAT }}
+      STOCK_TG_CHAT_EXTRA: ${{ secrets.STOCK_TG_CHAT_EXTRA }}
+      STOCK_BASE_DIR: ${{ github.workspace }}
+      TZ: Asia/Taipei
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install deps
+        run: |
+          pip install --upgrade pip
+          pip install requests pandas numpy yfinance
+
+      - name: Run US premarket analyzer
+        run: |
+          mkdir -p logs
+          python us_premarket_analyzer.py
+
+      - name: Upload logs (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: us-premarket-logs
+          path: logs/
+          retention-days: 7
