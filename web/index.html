@@ -43,18 +43,23 @@
     font-size: 13px;
     font-family: inherit;
   }
-  .status-banner {
-    padding: 8px 20px;
-    background: rgba(63,185,80,0.1);
-    border-bottom: 1px solid rgba(63,185,80,0.2);
-    font-size: 11px;
-    color: #3fb950;
+
+  /* 大盤判決橫幅（動態顯示） */
+  .verdict-banner {
+    padding: 10px 20px;
+    font-size: 13px;
     text-align: center;
+    font-weight: bold;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
   }
+  .verdict-banner.red    { background: rgba(220,53,69,0.15);  color: #f85149; }
+  .verdict-banner.orange { background: rgba(240,165,0,0.15);  color: #f0a500; }
+  .verdict-banner.green  { background: rgba(63,185,80,0.15);  color: #3fb950; }
+  .verdict-banner.gray   { background: rgba(139,148,158,0.15); color: #adbac7; }
 
   .grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr;
     gap: 12px;
     padding: 16px;
   }
@@ -63,27 +68,29 @@
     border: 1px solid rgba(255,255,255,0.08);
     border-left: 4px solid var(--accent);
     border-radius: 14px;
-    padding: 16px 14px;
+    padding: 14px 16px;
     text-decoration: none;
     color: inherit;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    min-height: 110px;
+    display: block;
     transition: transform 0.15s, background 0.15s;
     position: relative;
-    overflow: hidden;
   }
-  .tile:active { transform: scale(0.96); background: rgba(255,255,255,0.08); }
-  .tile .icon { font-size: 26px; margin-bottom: 4px; }
-  .tile .title { font-size: 15px; font-weight: bold; color: #fff; }
-  .tile .sub   { font-size: 11px; color: #8b949e; margin-top: 3px; }
-  .tile .badge {
-    position: absolute; top: 10px; right: 10px;
-    padding: 2px 7px; border-radius: 10px;
-    background: rgba(255,255,255,0.12); color: #fff;
-    font-size: 10px; font-weight: bold;
+  .tile:active { transform: scale(0.98); background: rgba(255,255,255,0.08); }
+  .tile-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
   }
+  .tile-icon { font-size: 22px; }
+  .tile-title { flex: 1; font-size: 16px; font-weight: bold; color: #fff; }
+  .tile-arrow { color: #58a6ff; font-size: 20px; opacity: 0.6; }
+
+  .tile-summary { font-size: 12px; color: #adbac7; line-height: 1.55; }
+  .tile-summary .row { display: flex; justify-content: space-between; padding: 2px 0; }
+  .tile-summary .k { color: #8b949e; }
+  .tile-summary .v { color: #fff; font-weight: 500; }
+  .tile-summary .pos { color: #3fb950; }
+  .tile-summary .neg { color: #f85149; }
+  .tile-summary .warn { color: #f0a500; }
+  .tile-summary .top { margin-top: 4px; color: #58a6ff; font-size: 11px; }
 
   /* accent 顏色 */
   .tile.holdings   { --accent: #f0c040; }
@@ -114,11 +121,8 @@
     font-size: 13px;
     font-weight: bold;
   }
-  .full-chart-btn:active { background: rgba(88,166,255,0.2); }
 
-  .external-list {
-    padding: 0 16px 16px;
-  }
+  .external-list { padding: 0 16px 16px; }
   .external-item {
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 14px;
@@ -149,11 +153,9 @@
   </div>
 </header>
 
-<div class="status-banner" id="statusBanner">
-  🟢 雲端排程運作中（GitHub Actions）
-</div>
+<div id="verdictBanner" class="verdict-banner gray">載入中...</div>
 
-<div class="section-divider">📊 選擇主題</div>
+<div class="section-divider">📊 今日快看</div>
 
 <div class="grid" id="tileGrid"></div>
 
@@ -183,17 +185,18 @@
 <footer>© 2026 · Cloudflare Pages + GitHub Actions</footer>
 
 <script>
-// ─── 主題 tiles ───
 const THEMES = [
-  { key: "holdings",  anchor: "holdings-grid",  icon: "📊", title: "我的持股",   sub: "P/L + 券商目標價 + MA 分析" },
-  { key: "v42",       anchor: "flash-grid",     icon: "🌟", title: "V42 飆股",   sub: "族群輪動雙過濾" },
-  { key: "breakouts", anchor: "breakouts-grid", icon: "⚡",  title: "即將突破",   sub: "壓力突破候選" },
-  { key: "pullbacks", anchor: "pullbacks-grid", icon: "🎯", title: "拉回月線",   sub: "月線支撐買點" },
-  { key: "merger",    anchor: "merger-grid",    icon: "🤝", title: "併購案",     sub: "M&A 新聞監測" },
-  { key: "sector",    anchor: "sector-rotation", icon: "🏭", title: "族群輪動",   sub: "46 子族群 + 資金階段" },
+  { key:"holdings",  anchor:"holdings-grid",   icon:"📊", title:"我的持股" },
+  { key:"v42",       anchor:"flash-grid",      icon:"🌟", title:"V42 飆股" },
+  { key:"breakouts", anchor:"breakouts-grid",  icon:"⚡",  title:"即將突破" },
+  { key:"pullbacks", anchor:"pullbacks-grid",  icon:"🎯", title:"拉回月線" },
+  { key:"merger",    anchor:"merger-grid",     icon:"🤝", title:"併購案" },
+  { key:"sector",    anchor:"sector-rotation", icon:"🏭", title:"族群輪動" },
 ];
 
-// ─── 日期偵測 ───
+let currentDate = null;
+let summary = null;
+
 async function detectDates() {
   const dates = [];
   const today = new Date();
@@ -224,56 +227,134 @@ function displayDate(ymd) {
   return `${m}/${d}（週${dow}）`;
 }
 
-let currentDate = null;
+async function loadSummary(ymd) {
+  try {
+    const r = await fetch(`/summary_${ymd}.json`);
+    if (r.ok) return await r.json();
+  } catch {}
+  return null;
+}
+
+function fmtNum(n) {
+  if (n == null) return "-";
+  return Math.abs(n) >= 1000 ? n.toLocaleString() : String(n);
+}
+
+function tileHTML(theme, s) {
+  let summaryHTML = "";
+  if (!s) {
+    summaryHTML = `<div class="tile-summary" style="color:#6b7280">尚無摘要資料</div>`;
+  } else if (theme.key === "holdings") {
+    const h = s.holdings || {};
+    const plClass = h.total_pct >= 0 ? "pos" : "neg";
+    const plSign = h.total_pl >= 0 ? "+" : "";
+    let worstHTML = "";
+    if (h.worst) {
+      worstHTML = `<div class="row"><span class="k">最弱</span><span class="warn">${h.worst.sid} ${h.worst.name} ${h.worst.pl_pct.toFixed(1)}%</span></div>`;
+    }
+    summaryHTML = `<div class="tile-summary">
+      <div class="row"><span class="k">總損益</span><span class="v ${plClass}">${plSign}${fmtNum(h.total_pl)}（${h.total_pct}%）</span></div>
+      <div class="row"><span class="k">持有</span><span class="v">${h.count} 支｜市值 ${fmtNum(h.total_mv)}</span></div>
+      ${worstHTML}
+    </div>`;
+  } else if (theme.key === "v42") {
+    const v = s.flash || {};
+    const topHTML = (v.top && v.top.length) ? `<div class="top">🎯 ${v.top.slice(0,3).join(" · ")}</div>` : "";
+    summaryHTML = `<div class="tile-summary">
+      <div class="row"><span class="k">命中</span><span class="v">${v.count} 支</span></div>
+      <div class="row"><span class="k">分佈</span><span class="v">🏆${v.aaa} 🥇${v.aa} 🥈${v.a} ⚠️${v.b}</span></div>
+      ${topHTML}
+    </div>`;
+  } else if (theme.key === "breakouts") {
+    const b = s.breakouts || {};
+    const topHTML = (b.top && b.top.length) ? `<div class="top">🎯 ${b.top.slice(0,3).join(" · ")}</div>` : "";
+    summaryHTML = `<div class="tile-summary">
+      <div class="row"><span class="k">候選</span><span class="v">${b.count} 支壓力突破中</span></div>
+      ${topHTML}
+    </div>`;
+  } else if (theme.key === "pullbacks") {
+    const p = s.pullbacks || {};
+    const topHTML = (p.top && p.top.length) ? `<div class="top">🎯 ${p.top.slice(0,3).join(" · ")}</div>` : "";
+    summaryHTML = `<div class="tile-summary">
+      <div class="row"><span class="k">候選</span><span class="v">${p.count} 支拉回月線</span></div>
+      ${topHTML}
+    </div>`;
+  } else if (theme.key === "merger") {
+    const m = s.merger || {};
+    if (m.count) {
+      const topHTML = (m.top && m.top.length) ? `<div class="top">🎯 ${m.top.slice(0,3).join(" · ")}</div>` : "";
+      summaryHTML = `<div class="tile-summary">
+        <div class="row"><span class="k">今日新聞</span><span class="v">${m.count} 支併購/收購案</span></div>
+        ${topHTML}
+      </div>`;
+    } else {
+      summaryHTML = `<div class="tile-summary" style="color:#6b7280">今日無 M&A 新聞</div>`;
+    }
+  } else if (theme.key === "sector") {
+    const sec = s.sector || {};
+    const tops = sec.top && sec.top.length ? sec.top.slice(0,3).join(" · ") : "點入查看排行";
+    summaryHTML = `<div class="tile-summary">
+      <div class="row"><span class="k">主升族群</span><span class="v" style="text-align:right">${tops}</span></div>
+    </div>`;
+  }
+
+  const url = theme.anchor ? `/飆股圖表_${currentDate}.html#${theme.anchor}` : `/飆股圖表_${currentDate}.html`;
+  return `<a class="tile ${theme.key}" href="${url}">
+    <div class="tile-head">
+      <div class="tile-icon">${theme.icon}</div>
+      <div class="tile-title">${theme.title}</div>
+      <div class="tile-arrow">›</div>
+    </div>
+    ${summaryHTML}
+  </a>`;
+}
+
+function verdictClass(v) {
+  if (!v) return "gray";
+  if (v.includes("🔴") || v.includes("警告")) return "red";
+  if (v.includes("🟠") || v.includes("轉弱")) return "orange";
+  if (v.includes("🟢") || v.includes("多方"))  return "green";
+  return "gray";
+}
 
 function switchDate() {
   currentDate = document.getElementById("datePicker").value;
-  renderTiles();
+  render();
 }
 
-function renderTiles() {
-  const grid = document.getElementById("tileGrid");
-  const btn = document.getElementById("fullChartBtn");
-  if (!currentDate) {
-    grid.innerHTML = `<div style="grid-column:1/-1;color:#8b949e;text-align:center;padding:40px 20px">
-      尚無資料<br><br>雲端排程今晚 15:40 開始運作
-    </div>`;
-    btn.style.display = "none";
-    return;
+async function render() {
+  if (!currentDate) return;
+  summary = await loadSummary(currentDate);
+  // 大盤判決 banner
+  const banner = document.getElementById("verdictBanner");
+  if (summary && summary.market_verdict) {
+    banner.textContent = "🎯 " + summary.market_verdict;
+    banner.className = "verdict-banner " + verdictClass(summary.market_verdict);
+  } else {
+    banner.textContent = "🟢 雲端排程運作中（GitHub Actions）";
+    banner.className = "verdict-banner green";
   }
-  const dateLabel = displayDate(currentDate);
-  grid.innerHTML = THEMES.map(t => {
-    const url = t.anchor ? `/飆股圖表_${currentDate}.html#${t.anchor}` : `/飆股圖表_${currentDate}.html`;
-    return `<a class="tile ${t.key}" href="${url}">
-      <div>
-        <div class="icon">${t.icon}</div>
-        <div class="title">${t.title}</div>
-        <div class="sub">${t.sub}</div>
-      </div>
-      <div class="badge">${dateLabel.slice(0,5)}</div>
-    </a>`;
-  }).join("");
-  btn.href = `/飆股圖表_${currentDate}.html`;
-  btn.style.display = "block";
+  // 6 個 tile
+  document.getElementById("tileGrid").innerHTML = THEMES.map(t => tileHTML(t, summary)).join("");
+  // 完整版
+  document.getElementById("fullChartBtn").href = `/飆股圖表_${currentDate}.html`;
 }
 
-// ─── init ───
 (async () => {
   const dates = await detectDates();
   const picker = document.getElementById("datePicker");
   if (!dates.length) {
     picker.innerHTML = `<option value="">尚無資料</option>`;
-    renderTiles();
+    document.getElementById("tileGrid").innerHTML = `<div style="color:#8b949e;text-align:center;padding:40px 20px">尚無資料</div>`;
     return;
   }
   picker.innerHTML = dates.map((d, i) =>
     `<option value="${d}"${i === 0 ? ' selected' : ''}>${displayDate(d)}${i === 0 ? ' · 今日' : ''}</option>`
   ).join("");
   currentDate = dates[0];
-  renderTiles();
+  render();
 })();
 
-// PWA
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
