@@ -387,14 +387,17 @@ function stockCard(x, accent) {
     ? `<span class="${plCls}">${plSign}${x.pl_pct.toFixed(2)}%</span>` : '';
   const actionLine = x.action ? `<div class="action">💡 ${x.action}</div>` : '';
   const commLine = x.commentary ? `<div class="commentary">${x.commentary}</div>` : '';
-  return `<div class="stock-item" style="--sa:${accent}">
+  // 點下去打開該股詳細（chart 帶 ?sid=X#holdings-grid）
+  const url = `/飆股圖表_${currentDate}.html?sid=${x.sid}#holdings-grid`;
+  return `<a href="${url}" class="stock-item stock-link" style="--sa:${accent};text-decoration:none;color:inherit;display:block">
     <div class="r1">
       <div><span class="sid">${x.sid}</span><span class="name">${x.name}</span></div>
-      <div>${priceLine} ${plLine}</div>
+      <div>${priceLine} ${plLine} <span style="color:#58a6ff;font-size:14px;margin-left:6px">›</span></div>
     </div>
     ${actionLine}
     ${commLine}
-  </div>`;
+    <div style="margin-top:6px;font-size:10px;color:#8b949e">👉 點開看 K 線 · 籌碼 · 策略匹配</div>
+  </a>`;
 }
 
 function stockCardBreak(x, accent) {

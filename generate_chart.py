@@ -2441,23 +2441,15 @@ canvas {{ width: 100% !important; }}
 </style>
 </head>
 <body>
-<!-- PWA 回首頁按鈕 -->
 <a href="/" style="position:fixed;top:calc(env(safe-area-inset-top) + 8px);left:12px;z-index:99999;background:rgba(13,20,36,0.92);color:#f0c040;padding:9px 16px;border-radius:22px;text-decoration:none;font-size:14px;font-weight:bold;border:1px solid rgba(240,196,64,0.4);box-shadow:0 4px 12px rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">← 回首頁</a>
 <script>
-// PWA section filter：hash 指定時只顯示該 section（避免上下滑到其他區塊）
 (function(){{
   const HEADER_KWS = {{
-    "即將突破":"breakouts-grid",
-    "拉回月線":"pullbacks-grid",
-    "子族群輪動":"sector-rotation",
-    "V42 飆股":"flash-grid",
-    "我的持股":"holdings-grid",
-    "併購/收購":"merger-grid"
+    "即將突破":"breakouts-grid","拉回月線":"pullbacks-grid","子族群輪動":"sector-rotation",
+    "V42 飆股":"flash-grid","我的持股":"holdings-grid","併購/收購":"merger-grid"
   }};
   const KEEP_CLASS = new Set(['header','controls','tooltip']);
-  function apply(){{
-    const hash = (location.hash || '').replace('#','');
-    if (!hash) return;
+  function applySection(hash){{
     for (const el of Array.from(document.body.children)) {{
       const tag = el.tagName;
       if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'A') continue;
@@ -2467,10 +2459,8 @@ canvas {{ width: 100% !important; }}
       else if (el.id) sec = el.id;
       else {{
         const h2 = el.querySelector && el.querySelector('h2');
-        if (h2) {{
-          for (const [kw, key] of Object.entries(HEADER_KWS)) {{
-            if (h2.textContent.includes(kw)) {{ sec = key; break; }}
-          }}
+        if (h2) for (const [kw, key] of Object.entries(HEADER_KWS)) {{
+          if (h2.textContent.includes(kw)) {{ sec = key; break; }}
         }}
       }}
       if (sec) el.dataset.section = sec;
@@ -2479,6 +2469,29 @@ canvas {{ width: 100% !important; }}
       if (el.dataset.section !== hash) el.style.display = 'none';
     }});
     document.querySelectorAll('.header, .controls').forEach(el => el.style.display = 'none');
+  }}
+  function applySid(sid){{
+    const tryOnce = () => {{
+      const canvas = document.getElementById(`hc_${{sid}}`) || document.getElementById(`c_${{sid}}`);
+      if (!canvas) return false;
+      const card = canvas.closest('.card');
+      if (!card) return false;
+      const grid = card.parentElement;
+      Array.from(grid.children).forEach(c => {{ if (c !== card && c.classList && c.classList.contains('card')) c.style.display = 'none'; }});
+      const banner = document.createElement('div');
+      banner.style.cssText = 'padding:12px 20px;font-size:13px;color:#f0c040;background:rgba(240,196,64,0.08);border-bottom:1px solid rgba(240,196,64,0.2)';
+      banner.innerHTML = `🔍 深入單支：<b>${{sid}}</b>（其他已隱藏）`;
+      card.parentElement.parentElement.insertBefore(banner, card.parentElement);
+      return true;
+    }};
+    let n = 0;
+    const timer = setInterval(() => {{ if (tryOnce() || ++n > 40) clearInterval(timer); }}, 200);
+  }}
+  function apply(){{
+    const hash = (location.hash || '').replace('#','');
+    const sid = new URLSearchParams(location.search).get('sid');
+    if (hash) applySection(hash);
+    if (sid) applySid(sid);
   }}
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
   else apply();
