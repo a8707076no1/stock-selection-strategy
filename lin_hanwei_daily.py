@@ -36,13 +36,14 @@ MODE_CONFIG = {
     },
     "postmarket": {
         "must_have":  ["#決勝關鍵"],
-        "must_not":   ["周末特別版"],
+        "must_not":   ["周末特別版", "假日版"],   # 排除週末版（都算「假日/週末」)
         "label":      "🌇 盤後解盤",
         "max_age_hours": 16,
         "history_file": "lin_hanwei_postmarket_history.json",
     },
     "weekend": {
-        "must_have":  ["決勝關鍵", "周末特別版"],
+        "must_have":  ["決勝關鍵"],
+        "must_have_any": ["周末特別版", "假日版"],   # 兩種寫法皆可（頻道 8/1 起改名）
         "must_not":   [],
         "label":      "🏖️ 週末特別版",
         "max_age_hours": 8*24,
@@ -81,6 +82,10 @@ def get_latest_video(mode_cfg):
             # must have all
             if not all(kw in title for kw in mode_cfg["must_have"]):
                 continue
+            # must have any（OR，其中一個即可）
+            if mode_cfg.get("must_have_any"):
+                if not any(kw in title for kw in mode_cfg["must_have_any"]):
+                    continue
             # must not have any
             if any(kw in title for kw in mode_cfg["must_not"]):
                 continue
