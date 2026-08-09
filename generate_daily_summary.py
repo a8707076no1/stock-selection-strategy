@@ -32,7 +32,7 @@ def parse_chart(html_path):
     summary = {"date": date_str, "ymd": ymd}
 
     # 1. 我的持股
-    h = {"count": 0, "total_pl": 0, "total_pct": 0, "worst": None}
+    h = {"count": 0, "total_pl": 0, "total_pct": 0, "worst": None, "details": []}
     m = re.search(r'市值\s*([\d,]+)', txt)
     if m: h["total_mv"] = int(m.group(1).replace(",",""))
     m = re.search(r'損益\s*(-?[\d,+]+)\s*（(-?[\d.+]+)%）', txt)
@@ -42,20 +42,26 @@ def parse_chart(html_path):
     m = re.search(r'共\s*(\d+)\s*支', txt)
     if m: h["count"] = int(m.group(1))
 
-    # 從 holdings JS array 抓最慘的股
     m = re.search(r'const holdings\s*=\s*(\[.*?\])\s*;\s*const', txt, re.DOTALL)
     if m:
         try:
             arr = json.loads(m.group(1))
             h["count"] = len(arr)
-            # 找最慘的個股（排除 ETF）
             non_etf = [x for x in arr if not x.get("is_etf")]
             if non_etf:
                 worst = min(non_etf, key=lambda x: x.get("pl_pct", 0))
-                h["worst"] = {
-                    "sid": worst.get("sid"), "name": worst.get("name"),
-                    "pl_pct": worst.get("pl_pct")
-                }
+                h["worst"] = {"sid": worst.get("sid"), "name": worst.get("name"), "pl_pct": worst.get("pl_pct")}
+            # 每支持股簡摘：sid/name/pl_pct/action
+            for x in arr:
+                h["details"].append({
+                    "sid": x.get("sid"), "name": x.get("name",""),
+                    "is_etf": x.get("is_etf", False),
+                    "current": x.get("current", 0),
+                    "pl_pct": x.get("pl_pct", 0),
+                    "pl_amt": x.get("pl_amt", 0),
+                    "action": x.get("action") or x.get("strat_action", ""),
+                    "commentary": (x.get("commentary","") or "")[:200],
+                })
         except Exception as e:
             print(f"  ⚠️ holdings parse: {e}")
     summary["holdings"] = h
@@ -78,10 +84,18 @@ def parse_chart(html_path):
         try:
             arr = json.loads(m.group(1))
             v["top"] = [f"{x.get('sid')} {x.get('name','')}" for x in arr[:3]]
+            v["details"] = [{
+                "sid": x.get("sid"), "name": x.get("name",""),
+                "tier": x.get("tier",""),
+                "sector": x.get("sector","") or x.get("subsector",""),
+                "score": x.get("score", 0),
+                "current": x.get("current", 0),
+                "chg_pct": x.get("chg_pct", 0),
+            } for x in arr]
         except: pass
     summary["flash"] = v
 
-    # 4. 突破 / 拉回 / 併購 — 從 JS 數陣列
+    # 4. 突破 / 拉回 / 併購
     for jsvar, key in [("breakouts","breakouts"), ("pullbacks","pullbacks"), ("mergerPicks","merger")]:
         m = re.search(rf'const {jsvar}\s*=\s*(\[.*?\])\s*;', txt, re.DOTALL)
         if m:
@@ -89,12 +103,19 @@ def parse_chart(html_path):
                 arr = json.loads(m.group(1))
                 summary[key] = {
                     "count": len(arr),
-                    "top": [f"{x.get('sid')} {x.get('name','')}" for x in arr[:3]]
+                    "top": [f"{x.get('sid')} {x.get('name','')}" for x in arr[:3]],
+                    "details": [{
+                        "sid": x.get("sid"), "name": x.get("name",""),
+                        "current": x.get("current", 0),
+                        "chg_pct": x.get("chg_pct", 0),
+                        "signal": x.get("sig","") or x.get("action",""),
+                        "note": (x.get("note","") or x.get("commentary","") or "")[:150],
+                    } for x in arr]
                 }
             except:
-                summary[key] = {"count": 0, "top": []}
+                summary[key] = {"count": 0, "top": [], "details": []}
         else:
-            summary[key] = {"count": 0, "top": []}
+            summary[key] = {"count": 0, "top": [], "details": []}
 
     # 5. 族群輪動 — 從 h2 附近抓 top 3 族群名（大致）
     # 簡易：抓 <b>族群名</b>（前置 emoji）在 sector rotation 區塊
