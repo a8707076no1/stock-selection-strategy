@@ -400,20 +400,26 @@ function stockCard(x, accent) {
   </a>`;
 }
 
-function stockCardBreak(x, accent) {
+function stockCardBreak(x, accent, gridKey) {
   const chg = x.chg_pct != null && x.chg_pct !== 0
     ? `<span class="${x.chg_pct >= 0 ? 'pl-pos' : 'pl-neg'}">${x.chg_pct >= 0 ? '+' : ''}${x.chg_pct.toFixed(2)}%</span>` : '';
   const price = x.current ? `<span class="price">$${x.current}</span>` : '';
   const sigLine = x.signal ? `<div class="action">📌 ${x.signal}</div>` : '';
   const noteLine = x.note ? `<div class="commentary">${x.note}</div>` : '';
-  return `<div class="stock-item" style="--sa:${accent}">
+  const url = gridKey ? `/飆股圖表_${currentDate}.html?sid=${x.sid}#${gridKey}` : null;
+  const inner = `
     <div class="r1">
       <div><span class="sid">${x.sid}</span><span class="name">${x.name}</span></div>
-      <div>${price} ${chg}</div>
+      <div>${price} ${chg} ${url ? '<span style="color:#58a6ff;font-size:14px;margin-left:6px">›</span>' : ''}</div>
     </div>
     ${sigLine}
     ${noteLine}
-  </div>`;
+    ${url ? '<div style="margin-top:6px;font-size:10px;color:#8b949e">👉 點開看 K 線 · 籌碼 · 策略</div>' : ''}
+  `;
+  if (url) {
+    return `<a href="${url}" class="stock-item" style="--sa:${accent};text-decoration:none;color:inherit;display:block">${inner}</a>`;
+  }
+  return `<div class="stock-item" style="--sa:${accent}">${inner}</div>`;
 }
 
 function modalBody(themeKey, s) {
@@ -453,13 +459,19 @@ function modalBody(themeKey, s) {
           <span>🏆AAA ${v.aaa}｜🥇AA ${v.aa}｜🥈A ${v.a}｜⚠️B ${v.b}</span>
         </div>
       </div>
-      ${arr.map(x => `<div class="stock-item" style="--sa:${acc}">
-        <div class="r1">
-          <div><span class="sid">${x.sid}</span><span class="name">${x.name}</span></div>
-          <div><span class="price">$${x.current || '-'}</span></div>
-        </div>
-        ${x.tier ? `<div class="action">🎖️ ${x.tier} 級 · ${x.sector || ''}</div>` : ''}
-      </div>`).join('')}
+      ${arr.map(x => {
+        const url = `/飆股圖表_${currentDate}.html?sid=${x.sid}#flash-grid`;
+        const chg = x.chg_pct != null && x.chg_pct !== 0
+          ? `<span class="${x.chg_pct >= 0 ? 'pl-pos' : 'pl-neg'}">${x.chg_pct >= 0 ? '+' : ''}${x.chg_pct.toFixed(2)}%</span>` : '';
+        return `<a href="${url}" class="stock-item" style="--sa:${acc};text-decoration:none;color:inherit;display:block">
+          <div class="r1">
+            <div><span class="sid">${x.sid}</span><span class="name">${x.name}</span></div>
+            <div><span class="price">$${x.current || '-'}</span> ${chg} <span style="color:#58a6ff;font-size:14px;margin-left:6px">›</span></div>
+          </div>
+          ${x.tier ? `<div class="action">🎖️ ${x.tier} 級 · ${x.sector || ''}</div>` : ''}
+          <div style="margin-top:6px;font-size:10px;color:#8b949e">👉 點開看 K 線 · 籌碼 · 策略</div>
+        </a>`;
+      }).join('')}
     `;
   }
 
@@ -468,18 +480,19 @@ function modalBody(themeKey, s) {
     const arr = (src && src.details) || [];
     if (!arr.length) return `<div class="modal-empty">今日無候選</div>`;
     const label = themeKey === "breakouts" ? "壓力突破" : "拉回月線";
+    const gridKey = themeKey === "breakouts" ? "breakouts-grid" : "pullbacks-grid";
     return `
       <div style="background:rgba(74,158,222,0.08);padding:10px 14px;border-radius:10px;margin-bottom:12px;font-size:12px">
         共 ${arr.length} 支${label}候選
       </div>
-      ${arr.map(x => stockCardBreak(x, acc)).join('')}
+      ${arr.map(x => stockCardBreak(x, acc, gridKey)).join('')}
     `;
   }
 
   if (themeKey === "merger") {
     const arr = (s.merger && s.merger.details) || [];
     if (!arr.length) return `<div class="modal-empty">今日無 M&A 相關新聞</div>`;
-    return arr.map(x => stockCardBreak(x, acc)).join('');
+    return arr.map(x => stockCardBreak(x, acc, "merger-grid")).join('');
   }
 
   if (themeKey === "sector") {
