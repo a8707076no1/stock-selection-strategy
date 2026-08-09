@@ -2470,19 +2470,30 @@ canvas {{ width: 100% !important; }}
     }});
     document.querySelectorAll('.header, .controls').forEach(el => el.style.display = 'none');
   }}
-  function applySid(sid){{
+  function applySid(sid, hash){{
+    const grid = hash ? document.getElementById(hash) : null;
     const tryOnce = () => {{
-      const canvas = document.getElementById(`hc_${{sid}}`) || document.getElementById(`c_${{sid}}`);
-      if (!canvas) return false;
-      const card = canvas.closest('.card');
-      if (!card) return false;
-      const grid = card.parentElement;
-      Array.from(grid.children).forEach(c => {{ if (c !== card && c.classList && c.classList.contains('card')) c.style.display = 'none'; }});
-      const banner = document.createElement('div');
-      banner.style.cssText = 'padding:12px 20px;font-size:13px;color:#f0c040;background:rgba(240,196,64,0.08);border-bottom:1px solid rgba(240,196,64,0.2)';
-      banner.innerHTML = `🔍 深入單支：<b>${{sid}}</b>（其他已隱藏）`;
-      card.parentElement.parentElement.insertBefore(banner, card.parentElement);
-      return true;
+      const scope = grid || document;
+      const codes = scope.querySelectorAll('.stock-code');
+      for (const el of codes) {{
+        if (el.textContent.trim() === sid) {{
+          const card = el.closest('.card');
+          if (!card) continue;
+          const targetGrid = card.parentElement;
+          Array.from(targetGrid.children).forEach(c => {{
+            if (c !== card && c.classList && c.classList.contains('card')) c.style.display = 'none';
+          }});
+          if (!targetGrid.dataset.singleBanner) {{
+            const banner = document.createElement('div');
+            banner.style.cssText = 'padding:12px 20px;font-size:13px;color:#f0c040;background:rgba(240,196,64,0.08);border:1px solid rgba(240,196,64,0.2);border-radius:8px;margin:8px 12px;';
+            banner.innerHTML = `🔍 深入單支：<b>${{sid}}</b>（其他已隱藏，回首頁看全部）`;
+            targetGrid.parentElement.insertBefore(banner, targetGrid);
+            targetGrid.dataset.singleBanner = '1';
+          }}
+          return true;
+        }}
+      }}
+      return false;
     }};
     let n = 0;
     const timer = setInterval(() => {{ if (tryOnce() || ++n > 40) clearInterval(timer); }}, 200);
@@ -2491,7 +2502,7 @@ canvas {{ width: 100% !important; }}
     const hash = (location.hash || '').replace('#','');
     const sid = new URLSearchParams(location.search).get('sid');
     if (hash) applySection(hash);
-    if (sid) applySid(sid);
+    if (sid) applySid(sid, hash);
   }}
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
   else apply();
