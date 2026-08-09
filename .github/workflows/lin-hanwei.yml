@@ -1,0 +1,103 @@
+name: Lin Hanwei Video Analysis
+
+on:
+  schedule:
+    # 盤前解盤 週一~五 08:30 TW = 00:30 UTC
+    - cron: '30 0 * * 1-5'
+    # 盤後解盤 週一~五 16:30 TW = 08:30 UTC
+    - cron: '30 8 * * 1-5'
+    # 週末特別版 週六 15:00 TW = 07:00 UTC 週六 (影片通常 12:30 前發)
+    - cron: '0 7 * * 6'
+    # 週末特別版備援 週日 10:00 TW = 02:00 UTC 週日
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '模式 (premarket/postmarket/weekend)'
+        required: true
+        default: 'weekend'
+        type: choice
+        options: [premarket, postmarket, weekend]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      STOCK_TG_TOKEN: ${{ secrets.STOCK_TG_TOKEN }}
+      STOCK_TG_CHAT:  ${{ secrets.STOCK_TG_CHAT }}
+      STOCK_TG_CHAT_EXTRA: ${{ secrets.STOCK_TG_CHAT_EXTRA }}
+      STOCK_BASE_DIR: ${{ github.workspace }}
+      TZ: Asia/Taipei
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 依觸發時間決定 mode
+        id: mode
+        run: |
+          if [ -n "${{ inputs.mode }}" ]; then
+            echo "mode=${{ inputs.mode }}" >> $GITHUB_OUTPUT
+          else
+            HOUR=$(TZ=Asia/Taipei date +%H)
+            DOW=$(TZ=Asia/Taipei date +%u)   # 1=Mon...6=Sat, 7=Sun
+            if [ "$DOW" -ge 6 ]; then
+              echo "mode=weekend" >> $GITHUB_OUTPUT
+            elif [ "$HOUR" -lt 12 ]; then
+              echo "mode=premarket" >> $GITHUB_OUTPUT
+            else
+              echo "mode=postmarket" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: 安裝 ffmpeg + yt-dlp
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          pip install --upgrade pip
+          pip install requests yt-dlp faster-whisper
+
+      - name: 快取 Whisper small model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: whisper-small-v1
+
+      - name: 建目錄 + 還原 history cache（避免重複處理已看過影片）
+        run: |
+          mkdir -p cache logs
+          # 從 GitHub Artifact 拉最新 history（若存在）
+          echo "Skip cache restore for first run"
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: lin-hanwei-history
+          path: cache/
+
+      - name: 執行林漢偉分析
+        run: |
+          python lin_hanwei_daily.py --mode ${{ steps.mode.outputs.mode }}
+
+      - name: 上傳 history cache（下次執行避免重複處理）
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lin-hanwei-history
+          path: cache/lin_hanwei_*.json
+          retention-days: 90
+          overwrite: true
+
+      - name: 失敗時上傳 log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lin-hanwei-failure-logs
+          path: |
+            logs/
+            cache/
+          retention-days: 7
