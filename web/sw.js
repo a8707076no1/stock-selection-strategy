@@ -1,5 +1,5 @@
 // Service Worker — 離線快取最新的 index + 最近圖表
-const CACHE = "stock-app-v5";
+const CACHE = "stock-app-v6";
 const CORE = ["/", "/manifest.json"];
 
 self.addEventListener("install", e => {

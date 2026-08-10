@@ -245,7 +245,8 @@ let currentDate = null;
 let summary = null;
 
 async function detectDates() {
-  const dates = [];
+  // 產生近 14 個工作日候選（排除週末）
+  const candidates = [];
   const today = new Date();
   for (let i = 0; i < 14; i++) {
     const d = new Date(today.getTime() - i * 86400000);
@@ -253,14 +254,20 @@ async function detectDates() {
     const y = d.getFullYear();
     const m = String(d.getMonth()+1).padStart(2,"0");
     const dd = String(d.getDate()).padStart(2,"0");
-    dates.push(`${y}${m}${dd}`);
-    if (dates.length >= 10) break;
+    candidates.push(`${y}${m}${dd}`);
+    if (candidates.length >= 10) break;
   }
+  // 用 fetch summary.json + JSON parse 判斷是否真存在（Cloudflare Pages 對不存在的
+  // 路徑會返 200 + index.html，用 HEAD 會誤判）
   const exists = [];
-  for (const ymd of dates) {
+  for (const ymd of candidates) {
     try {
-      const r = await fetch(`/飆股圖表_${ymd}.html`, { method: "HEAD" });
-      if (r.ok) exists.push(ymd);
+      const r = await fetch(`/summary_${ymd}.json?t=${Date.now()}`, { cache: "no-store" });
+      if (!r.ok) continue;
+      const ct = (r.headers.get("content-type") || "").toLowerCase();
+      if (!ct.includes("json")) continue;   // 非 JSON = SPA fallback
+      const j = await r.json();
+      if (j && j.ymd) exists.push(ymd);
     } catch {}
     if (exists.length >= 7) break;
   }
