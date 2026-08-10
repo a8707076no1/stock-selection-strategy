@@ -5,6 +5,9 @@
 <title>📈 台股飆股每日</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0d1424">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="飆股">
@@ -290,9 +293,11 @@ function renderTodayLine(latestYmd) {
 
 async function loadSummary(ymd) {
   try {
-    const r = await fetch(`/summary_${ymd}.json`);
+    const r = await fetch(`/summary_${ymd}.json?t=${Date.now()}`, { cache: "no-store" });
     if (r.ok) return await r.json();
-  } catch {}
+  } catch (e) {
+    console.error("loadSummary failed", e);
+  }
   return null;
 }
 
