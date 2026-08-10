@@ -536,16 +536,40 @@ function switchDate() {
   render();
 }
 
+function contextStatus(latestYmd) {
+  // 依當下時間 + 資料日給合適的狀態訊息
+  const now = new Date();
+  const y = now.getFullYear(), m = String(now.getMonth()+1).padStart(2,"0"), d = String(now.getDate()).padStart(2,"0");
+  const ymdToday = `${y}${m}${d}`;
+  const dow = now.getDay();  // 0=日 6=六
+  const hm = now.getHours() * 100 + now.getMinutes();
+
+  if (dow === 0 || dow === 6) {
+    return { text: `📅 週末｜台股休市 · 資料為 ${displayDate(latestYmd)}`, cls: "gray" };
+  }
+  if (ymdToday !== latestYmd) {
+    return { text: `📅 顯示最近交易日 ${displayDate(latestYmd)}（今日資料尚未產出）`, cls: "gray" };
+  }
+  // 今日 = 最新資料日：依時段給狀態
+  if (hm < 900)  return { text: "🌅 盤前｜等待開盤", cls: "gray" };
+  if (hm < 1330) return { text: "📈 盤中｜資料為前一日收盤", cls: "orange" };
+  if (hm < 1540) return { text: "⏳ 剛收盤｜今日圖表 15:40 產出", cls: "orange" };
+  return { text: "✅ 今日圖表已產出", cls: "green" };
+}
+
 async function render() {
   if (!currentDate) return;
   summary = await loadSummary(currentDate);
   const banner = document.getElementById("verdictBanner");
   if (summary && summary.market_verdict) {
+    // 主要：大盤判決
     banner.textContent = "🎯 " + summary.market_verdict;
     banner.className = "verdict-banner " + verdictClass(summary.market_verdict);
   } else {
-    banner.textContent = "🟢 雲端排程運作中（GitHub Actions）";
-    banner.className = "verdict-banner green";
+    // fallback：情境狀態
+    const s = contextStatus(currentDate);
+    banner.textContent = s.text;
+    banner.className = "verdict-banner " + s.cls;
   }
   document.getElementById("tileGrid").innerHTML = THEMES.map(t => tileHTML(t, summary)).join("");
   document.getElementById("fullChartBtn").href = `/飆股圖表_${currentDate}.html`;
