@@ -255,21 +255,21 @@ async function detectDates() {
     const m = String(d.getMonth()+1).padStart(2,"0");
     const dd = String(d.getDate()).padStart(2,"0");
     candidates.push(`${y}${m}${dd}`);
-    if (candidates.length >= 10) break;
+    if (candidates.length >= 6) break;
   }
-  // 用 fetch summary.json + JSON parse 判斷是否真存在（Cloudflare Pages 對不存在的
-  // 路徑會返 200 + index.html，用 HEAD 會誤判）
+  // 用 fetch summary.json + JSON parse 判斷是否真存在（CF Pages 對不存在的路徑
+  // 會返 200 + index.html，HEAD 會誤判）
   const exists = [];
   for (const ymd of candidates) {
     try {
       const r = await fetch(`/summary_${ymd}.json?t=${Date.now()}`, { cache: "no-store" });
       if (!r.ok) continue;
       const ct = (r.headers.get("content-type") || "").toLowerCase();
-      if (!ct.includes("json")) continue;   // 非 JSON = SPA fallback
+      if (!ct.includes("json")) continue;
       const j = await r.json();
       if (j && j.ymd) exists.push(ymd);
     } catch {}
-    if (exists.length >= 7) break;
+    if (exists.length >= 3) break;   // 只保留最近 3 個交易日
   }
   return exists;
 }
