@@ -14,14 +14,17 @@ log() { echo "[$(date '+%F %T')] $1" | tee -a "$LOG"; }
 
 cd "$BASE"
 
-# 1. 複製最近 10 個交易日的 chart 到 web/
+# 1. 複製最近 10 個交易日的 chart 到 web/（僅覆蓋較新的）
 log "📋 複製最近 chart 到 web/..."
 count=0
 for f in $(ls -t 飆股圖表_*.html 2>/dev/null | head -10); do
-    cp -u "$f" web/
-    count=$((count+1))
+    dst="web/$f"
+    if [ ! -f "$dst" ] || [ "$f" -nt "$dst" ]; then
+        cp "$f" "$dst"
+        count=$((count+1))
+    fi
 done
-log "  ✅ 複製 $count 個檔案"
+log "  ✅ 新複製/更新 $count 個檔案"
 
 # 2. 產出/更新 summary.json
 log "📊 產生 summary.json..."
