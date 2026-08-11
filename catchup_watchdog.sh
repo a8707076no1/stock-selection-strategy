@@ -43,11 +43,12 @@ is_weekday() {
 
 run_full_pipeline() {
   local ds=$1
-  log "🔄 補跑 ${ds} 完整流程: daily_update → screener → analyst_targets → chart"
+  log "🔄 補跑 ${ds} 完整流程: daily_update → screener → analyst_targets → chart → cloud_sync"
   "$PY" daily_yahoo_update.py >> "$LOG" 2>&1
   "$PY" taiwan_stock_screener_v3.py >> "$LOG" 2>&1
   "$PY" analyst_targets_scraper.py >> "$LOG" 2>&1
   "$PY" generate_chart.py >> "$LOG" 2>&1
+  /bin/bash "$BASE/sync_to_cloud.sh" >> "$LOG" 2>&1
   if [ -f "$BASE/飆股圖表_${ds}.html" ]; then
     log "✅ ${ds} 補跑成功"
     return 0

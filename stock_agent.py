@@ -222,6 +222,17 @@ def auto_fix(issues):
         if f"飆股圖表_{today}" in out or "HTML 報表已產生" in out:
             fixes.append("✅ 圖表程式執行成功")
             log("✅ 圖表程式執行成功")
+            # ☁️ 自動上傳 Cloudflare Pages（PWA App）
+            try:
+                sync_out = run_cmd(f"{BASE_DIR}/sync_to_cloud.sh", timeout=180)
+                if "部署成功" in sync_out or "Deployment complete" in sync_out:
+                    log("✅ Cloudflare Pages 已同步更新")
+                    fixes.append("☁️ 已同步至 PWA App")
+                else:
+                    log(f"⚠️ CF sync 未成功: {sync_out[-200:]}")
+                    fixes.append("⚠️ PWA 同步失敗（請看 logs/cloud_sync.log）")
+            except Exception as _e:
+                log(f"⚠️ CF sync 異常: {_e}")
         else:
             fixes.append(f"❌ 圖表程式執行失敗：{out[-200:]}")
             log(f"❌ 圖表程式執行失敗")
