@@ -117,34 +117,36 @@ def parse_chart(html_path):
         else:
             summary[key] = {"count": 0, "top": [], "details": []}
 
-    # 5. 族群輪動 — 從 sector rotation 表抓 top N 族群（用 #N 排名定位）
+    # 5. 族群輪動 — 掃 sector rotation table 內主 row（含「N 支」的族群 row）
     sector_section = ""
     idx = txt.find("子族群輪動")
     if idx > -1:
         sector_section = txt[idx:idx+80000]
-    # pattern：<td>...#N...</td>  然後下一個 <td>...族群名...</td>
-    tops_pairs = re.findall(
-        r'<td[^>]*>[^<]*#(\d+)[^<]*</td>\s*<td[^>]*>([^<]{3,40})</td>',
-        sector_section
-    )
     tops = []
-    for rank, name in tops_pairs[:8]:
-        name = re.sub(r'<[^>]+>', '', name).strip()
-        if len(name) >= 3 and name not in tops:
+    details = []
+    rows = re.findall(r'<tr[^>]*>(.*?)</tr>', sector_section, re.DOTALL)
+    for row in rows:
+        if not re.search(r'#\d+', row): continue
+        cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.DOTALL)
+        if len(cells) < 5: continue
+        clean = [re.sub(r'<[^>]+>', '', c).strip() for c in cells]
+        # 族群 row：cell[0] 含 # 排名，cell[2] 含「支」(成員數)
+        if '#' not in clean[0] or '支' not in clean[2]: continue
+        rank_m = re.search(r'#(\d+)', clean[0])
+        rank = int(rank_m.group(1)) if rank_m else 0
+        name = clean[1]
+        chg_20d = clean[4] if len(clean) > 4 else ""
+        chg_5d  = clean[5] if len(clean) > 5 else ""
+        stage   = clean[6] if len(clean) > 6 else ""
+        if name not in tops:
             tops.append(name)
-    # 也抽 20 日累積漲跌 給更多資訊
-    stage_data = re.findall(
-        r'#(\d+)[^<]*</td>\s*<td[^>]*>([^<]{3,40})</td>[^<]*<td[^>]*>[^<]*</td>[^<]*<td[^>]*>[^<]*</td>\s*<td[^>]*>\s*(?:<[^>]+>)*([\+\-]?[\d.]+%)',
-        sector_section
-    )
-    tops_with_pct = []
-    for rank, name, pct in stage_data[:8]:
-        name = re.sub(r'<[^>]+>', '', name).strip()
-        if name and name not in [x["name"] for x in tops_with_pct]:
-            tops_with_pct.append({"name": name, "chg_20d": pct, "rank": int(rank)})
+        details.append({
+            "rank": rank, "name": name,
+            "chg_20d": chg_20d, "chg_5d": chg_5d, "stage": stage
+        })
     summary["sector"] = {
-        "top": tops[:5] if tops else [],
-        "details": tops_with_pct[:6] if tops_with_pct else []
+        "top": tops[:6] if tops else [],
+        "details": details[:15] if details else []
     }
 
     return summary

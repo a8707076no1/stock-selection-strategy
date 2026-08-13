@@ -518,13 +518,21 @@ function modalBody(themeKey, s) {
     }
     if (details.length) {
       return `<div style="padding:0 4px">
-        <div style="color:#adbac7;font-size:12px;margin-bottom:12px">今日主升族群 (20 日累積漲幅排行)：</div>
-        ${details.map(x => `<div class="stock-item" style="--sa:${acc}">
-          <div class="r1">
-            <div><span class="sid">#${x.rank}</span><span class="name">${x.name}</span></div>
-            <div><span class="${x.chg_20d.startsWith('-') ? 'pl-neg' : 'pl-pos'}">${x.chg_20d}</span></div>
-          </div>
-        </div>`).join('')}
+        <div style="color:#adbac7;font-size:12px;margin-bottom:12px">今日族群輪動排行（含 20 日 / 5 日漲跌 + 階段）：</div>
+        ${details.map(x => {
+          const c20 = (x.chg_20d||"").startsWith('-') ? 'pl-neg' : 'pl-pos';
+          const c5  = (x.chg_5d||"").startsWith('-') ? 'pl-neg' : 'pl-pos';
+          return `<div class="stock-item" style="--sa:${acc}">
+            <div class="r1">
+              <div><span class="sid">#${x.rank}</span><span class="name">${x.name}</span></div>
+              <div>
+                <span class="${c20}">20D ${x.chg_20d}</span>
+                <span class="${c5}" style="margin-left:8px">5D ${x.chg_5d}</span>
+              </div>
+            </div>
+            ${x.stage ? `<div class="action" style="font-size:11px">📌 ${x.stage}</div>` : ''}
+          </div>`;
+        }).join('')}
       </div>`;
     }
     return `<div style="padding:0 4px">
