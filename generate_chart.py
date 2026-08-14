@@ -1736,14 +1736,26 @@ def build_merger_picks(pc, rev_data, tdcc=None, name_map=None, max_picks=30):
     except Exception:
         ind_m = {}
 
-    # 併購類關鍵字（依命中強度）
+    # 併購類關鍵字（依命中強度，含單字高頻詞）
     MA_KEYWORDS = [
-        "公開收購", "併購", "合併案", "合併方案", "現金合併", "換股合併", "股份轉換",
-        "整併", "借殼", "敵意收購", "收購股權", "收購計畫", "收購案",
-        "取得股權", "取得控制權", "增加持股", "策略入股", "策略合作",
-        "整合", "子公司收購", "子公司併購", "母公司收購", "私有化",
-        "合資", "成立合資公司", "M&A", "merger", "acquisition", "buyout",
+        # 單字（最強）
+        "收購", "併購", "合併", "整併",
+        # 具體案類型
+        "公開收購", "合併案", "合併方案", "現金合併", "換股合併", "股份轉換",
+        "敵意收購", "收購股權", "收購計畫", "收購案",
+        "併購案", "併購交易", "併購協議",
+        "借殼", "私有化", "下市", "退場",
+        # 動作
+        "取得股權", "取得控制權", "取得100%", "取得全部股權", "取得經營權",
+        "增加持股", "增資入股", "策略入股", "策略合作",
+        "子公司收購", "子公司併購", "母公司收購", "海外併購", "海外收購",
+        # 合資
+        "合資", "成立合資公司", "合資新設",
+        # 英文
+        "M&A", "merger", "acquisition", "buyout", "takeover",
     ]
+    # 排除詞（含這些的 title 不算真的併購）
+    MA_EXCLUDE = ["非收購", "否認收購", "拒絕收購", "無收購計畫", "非併購"]
 
     picks = []
     seen_sids = set()
@@ -1755,6 +1767,9 @@ def build_merger_picks(pc, rev_data, tdcc=None, name_map=None, max_picks=30):
         matched_news = []
         for n in news_list:
             title = (n.get("t") or "") if isinstance(n, dict) else str(n)
+            # 先排除「非收購/否認收購」等 false positive
+            if any(ex in title for ex in MA_EXCLUDE):
+                continue
             for kw in MA_KEYWORDS:
                 if kw in title:
                     matched_news.append({"title": title, "url": n.get("u","") if isinstance(n,dict) else "",
