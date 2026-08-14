@@ -1757,11 +1757,41 @@ def build_merger_picks(pc, rev_data, tdcc=None, name_map=None, max_picks=30):
     # 排除詞（含這些的 title 不算真的併購）
     MA_EXCLUDE = ["非收購", "否認收購", "拒絕收購", "無收購計畫", "非併購"]
 
+    # ★ 掃描來源：合併「rev_data 的 news」+「stock_news.json 全庫」+「merger_news.json 反向掃出的股」
+    news_by_sid = {}   # sid → list of news dict
+    # 1. rev_data
+    for sid, rev in (rev_data or {}).items():
+        if isinstance(rev, dict) and rev.get("news"):
+            news_by_sid.setdefault(sid, []).extend(rev["news"])
+    # 2. stock_news.json（全庫）
+    try:
+        sn_path = os.path.join(BASE_DIR, "cache", "stock_news.json")
+        if os.path.exists(sn_path):
+            sn = json.load(open(sn_path, encoding="utf-8"))
+            for sid, lst in sn.items():
+                if isinstance(lst, list) and lst:
+                    news_by_sid.setdefault(sid, []).extend(lst)
+    except Exception as _e:
+        print(f"  ⚠️ 讀 stock_news.json fail: {_e}")
+    # 3. merger_news.json（反向抓的 M&A 新聞）
+    try:
+        mn_path = os.path.join(BASE_DIR, "cache", "merger_news.json")
+        if os.path.exists(mn_path):
+            mn = json.load(open(mn_path, encoding="utf-8"))
+            by = mn.get("by_sid", {})
+            for sid, hits in by.items():
+                for h in hits:
+                    news_by_sid.setdefault(sid, []).append({
+                        "t": h.get("title",""), "u": h.get("url",""), "d": h.get("date","")
+                    })
+    except Exception as _e:
+        print(f"  ⚠️ 讀 merger_news.json fail: {_e}")
+
+    print(f"  📋 news 掃描範圍：{len(news_by_sid)} 支股（含 stock_news + rev + merger_news）")
+
     picks = []
     seen_sids = set()
-    for sid, rev in (rev_data or {}).items():
-        if not isinstance(rev, dict): continue
-        news_list = rev.get("news") or []
+    for sid, news_list in news_by_sid.items():
         if not news_list: continue
         # 找含關鍵字的新聞
         matched_news = []
