@@ -47,6 +47,11 @@ jobs:
       # cache key 用「年-月」，同月內共用 pkl（每天 append）
       # 月換時 key 變，會從 GH Release 種子重抓（fallback）
       # ─────────────────────────────────────────
+      - name: 決定 cache key（用日期，同天允許 hit，跨天 miss 觸發 restore）
+        id: cache_key
+        run: |
+          echo "date=$(date '+%Y%m%d')" >> $GITHUB_OUTPUT
+
       - name: 還原 price_data cache
         uses: actions/cache@v4
         with:
@@ -60,9 +65,11 @@ jobs:
             cache/merger_news.json
             cache/tdcc_holdings.json
             cache/stock_list_cache.json
-          key: stock-cache-v1-${{ github.run_id }}
+          # key 用今日 → 若當日已 save，直接 hit（同日重跑最快）
+          # restore-keys 用月前綴 → 跨月會抓上個月最後版本
+          key: stock-cache-v2-${{ steps.cache_key.outputs.date }}
           restore-keys: |
-            stock-cache-v1-
+            stock-cache-v2-
 
       - name: 檢查是否需初始化 K 線 cache
         id: check_cache
