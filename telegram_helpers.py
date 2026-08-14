@@ -6,7 +6,7 @@ import os, re, json, glob
 from html import escape as _html_escape
 from datetime import datetime
 
-BASE_DIR = os.path.expanduser("~/Desktop/Stock Selection Strategy")
+BASE_DIR = (os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy"))
 
 
 def _esc(v):

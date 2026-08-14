@@ -19,7 +19,7 @@ import pandas as pd
 import requests, urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-BASE_DIR  = os.path.expanduser("~/Desktop/Stock Selection Strategy")
+BASE_DIR  = (os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy"))
 CACHE_DIR = os.path.join(BASE_DIR, "cache")
 PRICE_CACHE = os.path.join(CACHE_DIR, "price_data.pkl")
 STOCK_LIST  = os.path.join(CACHE_DIR, "stock_list_cache.json")

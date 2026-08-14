@@ -99,33 +99,37 @@ jobs:
       - name: 首次初始化 K 線 cache（如需）
         if: steps.check_cache.outputs.need_init == 'true'
         run: |
-          echo "🐌 首次跑：抓全市場 1966 支 K 線 back to 2024-01-01..."
-          python expand_universe.py --start-date 2024-01-01 || true
+          echo "🐌 首次跑：抓全市場 K 線（expand_universe.py 預設全掃）..."
+          python expand_universe.py || true
 
       # ─────────────────────────────────────────
       # Daily pipeline（每天 15:40）
       # ─────────────────────────────────────────
       - name: 1️⃣ daily_yahoo_update（更新今日 K 棒）
         run: python daily_yahoo_update.py
+        continue-on-error: true
 
-      - name: 2️⃣ 併購新聞反向掃描
+      - name: 2️⃣ taiwan_stock_screener_v3（產出當日飆股 csv）
+        run: python taiwan_stock_screener_v3.py
+
+      - name: 3️⃣ 併購新聞反向掃描
         run: python merger_news_scanner.py
-        continue-on-error: true   # scanner 失敗不擋 chart
+        continue-on-error: true
 
-      - name: 3️⃣ 券商目標價（月度）
+      - name: 4️⃣ 券商目標價（月度）
         run: python analyst_targets_scraper.py
         continue-on-error: true
 
-      - name: 4️⃣ 主 chart 生成
+      - name: 5️⃣ 主 chart 生成
         run: python generate_chart.py
 
-      - name: 5️⃣ Daily summary
+      - name: 6️⃣ Daily summary
         run: python generate_daily_summary.py
 
       # ─────────────────────────────────────────
       # 把 chart HTML + summary.json 複製到 web/
       # ─────────────────────────────────────────
-      - name: 6️⃣ 複製產出到 web/
+      - name: 7️⃣ 複製產出到 web/
         run: |
           for f in $(ls -t 飆股圖表_*.html 2>/dev/null | head -10); do
             cp "$f" "web/$f"
@@ -136,7 +140,7 @@ jobs:
       # ─────────────────────────────────────────
       # 部署 Cloudflare Pages
       # ─────────────────────────────────────────
-      - name: 7️⃣ Deploy Cloudflare Pages
+      - name: 8️⃣ Deploy Cloudflare Pages
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: |
           npm install -g wrangler

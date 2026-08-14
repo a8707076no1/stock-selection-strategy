@@ -21,7 +21,7 @@ import urllib.parse, urllib.request
 from datetime import datetime, timedelta
 from xml.etree import ElementTree as ET
 
-BASE = os.path.expanduser("~/Desktop/Stock Selection Strategy")
+BASE = os.environ.get("STOCK_BASE_DIR") or (os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy"))
 CACHE = os.path.join(BASE, "cache")
 NEWS_CACHE = os.path.join(CACHE, "stock_news.json")
 MA_CACHE   = os.path.join(CACHE, "merger_news.json")

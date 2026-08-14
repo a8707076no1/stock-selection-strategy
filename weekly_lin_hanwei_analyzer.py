@@ -16,7 +16,7 @@
 import os, sys, re, json, time, subprocess
 from datetime import datetime, timedelta
 
-BASE = os.path.expanduser("~/Desktop/Stock Selection Strategy")
+BASE = (os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy"))
 LOG_DIR = os.path.join(BASE, "logs")
 CACHE_DIR = os.path.join(BASE, "cache")
 TMP_DIR = "/tmp/lin_hanwei"

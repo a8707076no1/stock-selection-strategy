@@ -8,7 +8,7 @@ SESSION = requests.Session()
 SESSION.verify = False
 SESSION.headers.update({"User-Agent": "Mozilla/5.0", "Referer": "https://www.twse.com.tw/"})
 
-BASE_DIR     = os.path.expanduser("~/Desktop/Stock Selection Strategy")
+BASE_DIR     = (os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy"))
 CACHE_DIR    = os.path.join(BASE_DIR, "cache")
 OUTPUT_DIR   = BASE_DIR
 HISTORY_FILE = os.path.join(CACHE_DIR, "top5_history.json")

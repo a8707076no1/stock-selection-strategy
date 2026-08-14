@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 FINMIND_API = "https://api.finmindtrade.com/api/v4/data"
 TOKEN       = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyNi0wMy0yOCAxMToxMjowNiIsInVzZXJfaWQiOiJhODcwNzA3NiIsImVtYWlsIjoiYTg3MDcwNzZAeWFob28uY29tLnR3IiwiaXAiOiIyMTAuMjQ0Ljg3LjYyIn0.9ud739ptCL3uJb1TQQTY1DJx9pVLg8dFinNb-p6yMoU"
 
-BASE_DIR    = os.path.expanduser("~/Desktop/Stock Selection Strategy")
+BASE_DIR    = (os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy"))
 CACHE_DIR   = os.path.join(BASE_DIR, "cache")
 OUTPUT_DIR  = BASE_DIR
 os.makedirs(CACHE_DIR, exist_ok=True)

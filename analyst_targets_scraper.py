@@ -18,7 +18,7 @@ import os, sys, re, json, time, urllib.parse, urllib.request
 from datetime import datetime
 from xml.etree import ElementTree as ET
 
-BASE = os.path.expanduser("~/Desktop/Stock Selection Strategy")
+BASE = (os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy"))
 CACHE = os.path.join(BASE, "cache", "analyst_targets_monthly.json")
 
 BROKER_PATTERNS = [

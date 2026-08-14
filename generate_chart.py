@@ -7,7 +7,7 @@ import pickle, json, os, sys, pandas as pd, numpy as np
 from datetime import datetime
 
 # 載入型態識別模組
-_BASE = os.path.expanduser("~/Desktop/Stock Selection Strategy")
+_BASE = (os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy"))
 sys.path.insert(0, _BASE)
 
 # ── 股票基本資料（產業、產品、月營收）──────────────────
@@ -688,7 +688,7 @@ def fetch_upcoming_dividends(sid, manual_override=None):
         "source": source,
     }
 
-BASE_DIR    = os.path.expanduser("~/Desktop/Stock Selection Strategy")
+BASE_DIR    = (os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy"))
 CACHE_DIR   = os.path.join(BASE_DIR, "cache")
 PRICE_CACHE = os.path.join(CACHE_DIR, "price_data.pkl")
 OUTPUT_DIR  = BASE_DIR
@@ -721,7 +721,7 @@ def prepare_chart_data(sid, pc, days=60):
     if len(df) < 5: return None
     return df
 
-_STOCK_LIST_CACHE = os.path.join(os.path.expanduser("~/Desktop/Stock Selection Strategy"),
+_STOCK_LIST_CACHE = os.path.join((os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy")),
                                   "cache", "stock_list_cache.json")
 def load_stock_names():
     """從 stock_list_cache.json 取得 {代碼: 中文名} 字典"""
@@ -854,7 +854,7 @@ def build_breakout_data(pc, name_map=None, tdcc=None):
     return top
 
 # ── 法人目標價（yfinance）+ 24 小時快取 ───────────
-_ANALYST_CACHE = os.path.join(os.path.expanduser("~/Desktop/Stock Selection Strategy"),
+_ANALYST_CACHE = os.path.join((os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy")),
                                "cache", "analyst_targets.json")
 
 def fetch_analyst_targets(sid, is_etf=False):

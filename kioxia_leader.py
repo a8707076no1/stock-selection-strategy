@@ -17,7 +17,7 @@
 import os, sys, json, re
 from datetime import datetime, timedelta
 
-BASE = os.path.expanduser("~/Desktop/Stock Selection Strategy")
+BASE = (os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy"))
 CACHE = os.path.join(BASE, "cache", "kioxia_leader.json")
 
 TICKER = "285A.T"

@@ -13,7 +13,7 @@ xlsx 格式（第 1 列為標頭）：
 import os, re, glob
 from datetime import datetime
 
-BASE_DIR = os.path.expanduser("~/Desktop/Stock Selection Strategy")
+BASE_DIR = (os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy"))
 HOLDINGS_FOLDER = os.path.join(BASE_DIR, "資產與持股明細更新案夾")
 
 # DEFAULT_HOLDINGS 為空 — 真實持股由 資產與持股明細更新案夾/*.xlsx 提供（gitignore 排除）

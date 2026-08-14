@@ -18,7 +18,7 @@
 import os, sys, re, json, glob
 from datetime import datetime
 
-BASE = os.path.expanduser("~/Desktop/Stock Selection Strategy")
+BASE = (os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy"))
 
 
 def parse_chart(html_path):
