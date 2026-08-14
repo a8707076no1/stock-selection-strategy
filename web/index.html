@@ -507,7 +507,33 @@ function modalBody(themeKey, s) {
   if (themeKey === "merger") {
     const arr = (s.merger && s.merger.details) || [];
     if (!arr.length) return `<div class="modal-empty">今日無 M&A 相關新聞</div>`;
-    return arr.map(x => stockCardBreak(x, acc, "merger-grid")).join('');
+    return `<div style="color:#adbac7;font-size:12px;margin-bottom:12px">
+        今日 ${arr.length} 支股有併購/收購新聞（點新聞看原文，點卡片看 K 線）：
+      </div>` + arr.map(x => {
+      const url = `/飆股圖表_${currentDate}.html?sid=${x.sid}#merger-grid`;
+      const news = x.merger_news || [];
+      const newsHTML = news.length ? `
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08)">
+          <div style="font-size:11px;color:#8b949e;margin-bottom:4px">📰 併購新聞（${news.length} 則）</div>
+          ${news.slice(0,4).map(n => `
+            <a href="${n.url}" target="_blank" style="display:block;font-size:11px;color:#adbac7;margin:4px 0;text-decoration:none;line-height:1.4" onclick="event.stopPropagation()">
+              <span style="color:#ffaa00;font-weight:bold">「${n.keyword}」</span>
+              ${n.title}
+              ${n.date ? `<span style="color:#6b7280"> · ${n.date}</span>` : ''}
+            </a>
+          `).join('')}
+        </div>` : `<div style="margin-top:8px;color:#6b7280;font-size:11px">（尚未關聯到具體新聞）</div>`;
+      return `<div class="stock-item" style="--sa:${acc}">
+        <div class="r1">
+          <div><span class="sid">${x.sid}</span><span class="name">${x.name}</span></div>
+          <div><span class="price">$${x.current || '-'}</span></div>
+        </div>
+        ${newsHTML}
+        <a href="${url}" style="display:block;margin-top:8px;padding:6px 10px;background:rgba(255,170,0,0.1);border:1px solid rgba(255,170,0,0.3);border-radius:6px;text-align:center;color:#ffaa00;text-decoration:none;font-size:11px;font-weight:bold">
+          📊 看 K 線 · 籌碼 · 目標價
+        </a>
+      </div>`;
+    }).join('');
   }
 
   if (themeKey === "sector") {

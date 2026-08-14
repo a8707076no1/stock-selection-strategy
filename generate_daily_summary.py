@@ -110,6 +110,12 @@ def parse_chart(html_path):
                         "chg_pct": x.get("chg_pct", 0),
                         "signal": x.get("sig","") or x.get("action",""),
                         "note": (x.get("note","") or x.get("commentary","") or "")[:150],
+                        # 併購案專屬：帶新聞（讓 PWA modal 直接顯示）
+                        "merger_news": [
+                            {"title": n.get("title","")[:200], "url": n.get("url",""),
+                             "keyword": n.get("keyword",""), "date": n.get("date","")}
+                            for n in (x.get("merger_news") or [])[:5]
+                        ] if key == "merger" else None,
                     } for x in arr]
                 }
             except:
