@@ -50,8 +50,20 @@ MA_KEYWORDS = [
     "M&A", "merger", "acquisition", "buyout", "takeover",
 ]
 
-EXCLUDE_KEYWORDS = ["非收購", "否認收購", "拒絕收購", "無收購計畫",
-                    "非併購", "非合併", "營收合併"]
+EXCLUDE_KEYWORDS = [
+    "非收購", "否認收購", "拒絕收購", "無收購計畫",
+    "非併購", "非合併",
+    # 會計/財報用語
+    "合併財報", "合併營收", "合併淨值", "合併損益", "合併負債", "合併資產",
+    "合併稅前", "合併稅後", "合併現金", "合併毛利", "合併費用", "合併EPS",
+    "合併每股", "合併ROE", "合併ROA", "合併報表", "合併帳",
+    "月合併", "季合併", "年度合併",
+]
+
+# 動態組合過濾：若標題含「合併」+ 財報詞 → 排除
+FIN_TERMS = ["財報", "營收", "淨值", "毛利", "營業", "EPS", "季報", "月報",
+             "年報", "資產", "負債", "現金", "損益", "收益", "報表",
+             "稅前", "稅後", "純益", "獲利"]
 
 
 def log(msg):
@@ -175,6 +187,8 @@ def main():
             if dt and dt < cutoff: continue
             # 排除 false positive
             if any(ex in title for ex in EXCLUDE_KEYWORDS): continue
+            # 動態組合：若含「合併」+ 任一財報詞 → 財報術語，排除
+            if "合併" in title and any(w in title for w in FIN_TERMS): continue
             # 關鍵字命中
             matched_kw = next((kw for kw in MA_KEYWORDS if kw in title), None)
             if not matched_kw: continue

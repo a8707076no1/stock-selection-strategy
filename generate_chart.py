@@ -1736,26 +1736,37 @@ def build_merger_picks(pc, rev_data, tdcc=None, name_map=None, max_picks=30):
     except Exception:
         ind_m = {}
 
-    # 併購類關鍵字（依命中強度，含單字高頻詞）
+    # 併購類關鍵字（依命中強度）
+    # 注意：「合併」單字太廣（會誤中「合併財報/合併營收」等會計術語），只保留組合詞
     MA_KEYWORDS = [
-        # 單字（最強）
-        "收購", "併購", "合併", "整併",
+        # 高強度單字（無會計 false positive）
+        "收購", "併購", "整併",
         # 具體案類型
         "公開收購", "合併案", "合併方案", "現金合併", "換股合併", "股份轉換",
         "敵意收購", "收購股權", "收購計畫", "收購案",
         "併購案", "併購交易", "併購協議",
-        "借殼", "私有化", "下市", "退場",
+        "借殼", "私有化",
         # 動作
         "取得股權", "取得控制權", "取得100%", "取得全部股權", "取得經營權",
-        "增加持股", "增資入股", "策略入股", "策略合作",
+        "增資入股", "策略入股",
         "子公司收購", "子公司併購", "母公司收購", "海外併購", "海外收購",
         # 合資
-        "合資", "成立合資公司", "合資新設",
+        "成立合資公司", "合資新設",
         # 英文
         "M&A", "merger", "acquisition", "buyout", "takeover",
     ]
     # 排除詞（含這些的 title 不算真的併購）
-    MA_EXCLUDE = ["非收購", "否認收購", "拒絕收購", "無收購計畫", "非併購"]
+    MA_EXCLUDE = [
+        # 主動否定
+        "非收購", "否認收購", "拒絕收購", "無收購計畫", "非併購", "非合併",
+        # 會計/財報用語（「合併」為集團財報術語，不是併購事件）
+        "合併財報", "合併營收", "合併淨值", "合併損益", "合併負債", "合併資產",
+        "合併稅前", "合併稅後", "合併現金", "合併毛利", "合併費用", "合併EPS",
+        "合併每股", "合併ROE", "合併ROA", "合併負責人", "合併會計",
+        "合併報表", "合併帳", "合併結算", "合併申報",
+        # 「合併營收」變體
+        "月合併", "季合併", "年度合併", "第Q合併",
+    ]
 
     # ★ 掃描來源：合併「rev_data 的 news」+「stock_news.json 全庫」+「merger_news.json 反向掃出的股」
     news_by_sid = {}   # sid → list of news dict
@@ -1797,8 +1808,14 @@ def build_merger_picks(pc, rev_data, tdcc=None, name_map=None, max_picks=30):
         matched_news = []
         for n in news_list:
             title = (n.get("t") or "") if isinstance(n, dict) else str(n)
-            # 先排除「非收購/否認收購」等 false positive
+            # 先排除 false positive
             if any(ex in title for ex in MA_EXCLUDE):
+                continue
+            # 若標題含「合併」+ 任何財報用語 → 一律排除（動態組合排除）
+            if "合併" in title and any(w in title for w in
+                ["財報", "營收", "淨值", "毛利", "營業", "EPS", "季報", "月報",
+                 "年報", "資產", "負債", "現金", "損益", "收益", "報表", "帳",
+                 "稅前", "稅後", "純益", "獲利"]):
                 continue
             for kw in MA_KEYWORDS:
                 if kw in title:
