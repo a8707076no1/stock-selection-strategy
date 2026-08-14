@@ -96,11 +96,19 @@ jobs:
       # 首次跑 or cache 遺失 → 從 Yahoo 抓 1966 支 back to 2024/1/1
       # 這步驟耗時 ~45 分鐘，只在初始化時執行
       # ─────────────────────────────────────────
-      - name: 首次初始化 K 線 cache（如需）
+      - name: 首次初始化 — 從 GH Release 下載 cache seed（如需）
         if: steps.check_cache.outputs.need_init == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "🐌 首次跑：抓全市場 K 線（expand_universe.py 預設全掃）..."
-          python expand_universe.py || true
+          echo "📥 cache miss，從 GH Release cache-seed-v1 下載..."
+          gh release download cache-seed-v1 --dir /tmp/ || {
+            echo "❌ Release 下載失敗"
+            exit 1
+          }
+          tar xzf /tmp/stock_cache_seed.tgz -C cache/
+          echo "✅ Cache 還原完成："
+          ls -lh cache/ | head
 
       # ─────────────────────────────────────────
       # Daily pipeline（每天 15:40）
