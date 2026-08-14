@@ -1,0 +1,149 @@
+name: Daily Chart Pipeline (15:40 TW)
+
+on:
+  schedule:
+    # 07:40 UTC = 15:40 TW（週一~五）
+    - cron: '40 7 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      force_full_rebuild:
+        description: '重抓所有 K 線（第一次跑或 cache 遺失時勾）'
+        required: false
+        default: 'false'
+        type: choice
+        options: ['false', 'true']
+
+concurrency:
+  group: daily-chart
+  cancel-in-progress: false
+
+jobs:
+  build-chart:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90   # 完整 rebuild 需要較長時間
+    env:
+      STOCK_TG_TOKEN:      ${{ secrets.STOCK_TG_TOKEN }}
+      STOCK_TG_CHAT:       ${{ secrets.STOCK_TG_CHAT }}
+      STOCK_TG_CHAT_EXTRA: ${{ secrets.STOCK_TG_CHAT_EXTRA }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      STOCK_BASE_DIR: ${{ github.workspace }}
+      TZ: Asia/Taipei
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: 建 cache / logs / web / holdings 目錄
+        run: |
+          mkdir -p cache logs web 資產與持股明細更新案夾
+
+      # ─────────────────────────────────────────
+      # 還原 price_data.pkl + cache/*.json（如果之前跑過留下的）
+      # cache key 用「年-月」，同月內共用 pkl（每天 append）
+      # 月換時 key 變，會從 GH Release 種子重抓（fallback）
+      # ─────────────────────────────────────────
+      - name: 還原 price_data cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            cache/price_data.pkl
+            cache/meta.json
+            cache/stock_news.json
+            cache/stock_revenue.json
+            cache/analyst_targets.json
+            cache/analyst_targets_monthly.json
+            cache/merger_news.json
+            cache/tdcc_holdings.json
+            cache/stock_list_cache.json
+          key: stock-cache-v1-${{ github.run_id }}
+          restore-keys: |
+            stock-cache-v1-
+
+      - name: 檢查是否需初始化 K 線 cache
+        id: check_cache
+        run: |
+          if [ ! -f cache/price_data.pkl ] || [ "${{ inputs.force_full_rebuild }}" = "true" ]; then
+            echo "need_init=true" >> $GITHUB_OUTPUT
+          else
+            SIZE=$(stat -c%s cache/price_data.pkl 2>/dev/null || echo 0)
+            echo "cache size: $SIZE bytes"
+            if [ "$SIZE" -lt 1000000 ]; then
+              echo "need_init=true" >> $GITHUB_OUTPUT
+            else
+              echo "need_init=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: 安裝依賴
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt || \
+            pip install requests pandas numpy yfinance openpyxl
+
+      # ─────────────────────────────────────────
+      # 首次跑 or cache 遺失 → 從 Yahoo 抓 1966 支 back to 2024/1/1
+      # 這步驟耗時 ~45 分鐘，只在初始化時執行
+      # ─────────────────────────────────────────
+      - name: 首次初始化 K 線 cache（如需）
+        if: steps.check_cache.outputs.need_init == 'true'
+        run: |
+          echo "🐌 首次跑：抓全市場 1966 支 K 線 back to 2024-01-01..."
+          python expand_universe.py --start-date 2024-01-01 || true
+
+      # ─────────────────────────────────────────
+      # Daily pipeline（每天 15:40）
+      # ─────────────────────────────────────────
+      - name: 1️⃣ daily_yahoo_update（更新今日 K 棒）
+        run: python daily_yahoo_update.py
+
+      - name: 2️⃣ 併購新聞反向掃描
+        run: python merger_news_scanner.py
+        continue-on-error: true   # scanner 失敗不擋 chart
+
+      - name: 3️⃣ 券商目標價（月度）
+        run: python analyst_targets_scraper.py
+        continue-on-error: true
+
+      - name: 4️⃣ 主 chart 生成
+        run: python generate_chart.py
+
+      - name: 5️⃣ Daily summary
+        run: python generate_daily_summary.py
+
+      # ─────────────────────────────────────────
+      # 把 chart HTML + summary.json 複製到 web/
+      # ─────────────────────────────────────────
+      - name: 6️⃣ 複製產出到 web/
+        run: |
+          for f in $(ls -t 飆股圖表_*.html 2>/dev/null | head -10); do
+            cp "$f" "web/$f"
+          done
+          echo "web/ contents:"
+          ls -la web/ | head -20
+
+      # ─────────────────────────────────────────
+      # 部署 Cloudflare Pages
+      # ─────────────────────────────────────────
+      - name: 7️⃣ Deploy Cloudflare Pages
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: |
+          npm install -g wrangler
+          wrangler pages deploy web --project-name=stock-selection --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: 上傳失敗 log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chart-fail-logs-${{ github.run_id }}
+          path: |
+            logs/
+            *.html
+          retention-days: 7
