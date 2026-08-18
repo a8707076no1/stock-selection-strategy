@@ -130,7 +130,16 @@ def get_stock_list():
                 sd[s] = {"name": n, "market": "tpex"}; tc += 1
         print("  上櫃："+str(tc)+" 支")
     except Exception as e: print("上櫃失敗："+str(e))
-    if not sd: raise RuntimeError("無法取得股票清單")
+    if not sd:
+        # ★ Fallback：TWSE/TPEX 都失敗（GHA 上常見）→ 用 stale cache
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file) as f: cached = json.load(f)
+                if cached.get("data"):
+                    print(f"  ⚠️ API 全失敗，改用 stale cache (date={cached.get('date','?')}, {len(cached['data'])} 支)")
+                    return cached["data"]
+            except: pass
+        raise RuntimeError("無法取得股票清單（TWSE/TPEX API 失敗且無 cache）")
     print("合計："+str(len(sd))+" 支")
     # 存快取
     with open(cache_file,"w") as f: json.dump({"date":today,"data":sd},f)
