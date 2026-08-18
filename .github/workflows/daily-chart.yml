@@ -148,7 +148,12 @@ jobs:
       # ─────────────────────────────────────────
       # 部署 Cloudflare Pages
       # ─────────────────────────────────────────
-      - name: 8️⃣ Deploy Cloudflare Pages
+      - name: 8️⃣ HealthCheck（發現空區塊立刻 Telegram alert）
+        if: always()
+        run: python pipeline_healthcheck.py
+        continue-on-error: true
+
+      - name: 9️⃣ Deploy Cloudflare Pages
         if: env.CLOUDFLARE_API_TOKEN != ''
         run: |
           npm install -g wrangler
