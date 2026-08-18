@@ -110,6 +110,13 @@ jobs:
           echo "✅ Cache 還原完成："
           ls -lh cache/ | head
 
+      - name: 下載最新持股 xlsx (holdings-current release)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download holdings-current --dir 資產與持股明細更新案夾/ 2>&1 || echo "⚠️ holdings release 抓不到（持股區塊會空）"
+          ls -lh 資產與持股明細更新案夾/ 2>&1 | head
+
       # ─────────────────────────────────────────
       # Daily pipeline（每天 15:40）
       # ─────────────────────────────────────────
