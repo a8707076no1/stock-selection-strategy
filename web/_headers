@@ -1,5 +1,9 @@
-# Cloudflare Pages 對 summary.json 強制 no-cache，避免 CDN 邊緣快取舊「不存在」回應
+# Cloudflare Pages 對所有動態 JSON + HTML 強制 no-cache
 /summary_*.json
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+
+/financial_expert_*.json
   Cache-Control: no-cache, no-store, must-revalidate
   Pragma: no-cache
 
