@@ -154,6 +154,39 @@ def transcribe(audio_path):
     return text
 
 
+def llm_summarize(transcript, guest, part_title=""):
+    """用 claude CLI 產 Monica 等級的結構化摘要。CLI 不可用回 None"""
+    prompt = f"""你是台股專業分析師。以下是 EBC 理財達人秀節目的逐字稿（來賓：{guest}）。
+請閱讀全文，用 markdown 條列格式產出**深度分析摘要**（8-10 點）。
+
+節目標題：{part_title}
+
+**要求**：
+1. 每點用「▸ **主題**：內容」格式，內容 30-80 字
+2. 涵蓋這些面向：大盤觀點 / 主打族群（含理由）/ 個股焦點（含股號股名，如「南亞科 (2408)」）/ 技術分析（月線季線 支撐壓力）/ 買賣時機建議 / 風險提醒
+3. 不要照抄逐字，用你自己的話**濃縮+重組**
+4. 若有具體目標價、關鍵事件（法說會、財報），一定要保留
+5. 只輸出摘要，不要開頭問候或收尾套話
+
+逐字稿：
+{transcript[:12000]}
+
+摘要："""
+    try:
+        import subprocess
+        r = subprocess.run(
+            ["claude", "-p", prompt],
+            capture_output=True, text=True, timeout=180,
+        )
+        out = (r.stdout or "").strip()
+        # 401 or 空 → 失敗
+        if not out or "401" in (r.stderr or "") or "Failed to authenticate" in out:
+            return None
+        return out
+    except Exception as e:
+        return None
+
+
 def extract_key_points(transcript, guest):
     """從轉錄抽：技術重點 / 留意個股 / 金句"""
     typo_map = {
@@ -293,6 +326,15 @@ def append_to_docx(date_str, parts_data, name_map=None):
         info  = pd_.get("info") or {}
         # part 副標
         sh = doc.add_heading(f"Part {p_num}｜{guest}", 2)
+
+        # ★ LLM 深度摘要（若有）— 這是最有價值的區塊，放最上面
+        if info.get("ai_summary"):
+            doc.add_paragraph("🤖 AI 深度摘要（Claude 產出）", style="Intense Quote")
+            for line in info["ai_summary"].split("\n"):
+                line = line.strip()
+                if line:
+                    doc.add_paragraph(line)
+            doc.add_paragraph()
 
         # 族群
         if info.get("sectors"):
@@ -516,6 +558,14 @@ def main():
                 f.write(transcript)
         info = extract_key_points(transcript, p.get("guest"))
         info["transcript"] = transcript   # ★ 完整轉錄也帶著
+        # ★ LLM 摘要（若 claude CLI 可用）
+        log(f"  🤖 嘗試 claude CLI 產 LLM 摘要...")
+        llm_out = llm_summarize(transcript, p.get("guest") or "", p.get("title",""))
+        if llm_out:
+            info["ai_summary"] = llm_out
+            log(f"  ✅ LLM 摘要 {len(llm_out)} 字")
+        else:
+            log(f"  ⚠️ claude CLI 不可用，僅使用 regex 抽取")
         log(f"  📊 族群 {len(info['sectors'])} / 個股 {len(info['stocks_mentioned'])} / "
             f"技術 {len(info['technical_notes'])} / 看好 {len(info['buy_signals'])}")
         p["info"] = info
