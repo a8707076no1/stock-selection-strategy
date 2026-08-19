@@ -48,6 +48,15 @@ def fetch_kioxia_1m():
     return df
 
 
+def fetch_prev_close():
+    """抓昨日收盤（用戶直覺對比）"""
+    import yfinance as yf
+    tk = yf.Ticker(TICKER)
+    df = tk.history(period="5d", interval="1d")
+    if df is None or len(df) < 2: return None
+    return float(df["Close"].iloc[-2])
+
+
 def find_max_vol_bar(df, start_hm=(8,0), end_hm=(8,30)):
     """在 TW HH:MM 區間找最大量 bar"""
     sh, sm = start_hm; eh, em = end_hm
@@ -146,52 +155,69 @@ def main():
     cur = current_price(df)
     if not cur:
         log("❌ 無現價"); return
-    log(f"📈 現價 ({cur['time']}): {cur['price']:.0f}")
+    log(f"📈 yfinance 最新 bar ({cur['time']}): {cur['price']:.0f}")
 
-    # 判定
+    prev_close = fetch_prev_close()
+    log(f"📉 昨收 (參考): {prev_close}")
+
+    # 雙軌判定：vs 早盤最大量 bar / vs 昨收
     bench_price = bench["close"]
     diff = cur["price"] - bench_price
     diff_pct = diff / bench_price * 100
     if cur["price"] > bench_price:
-        verdict_emoji = "🟢"
-        verdict_txt = "強勢開盤"
+        verdict_emoji = "🟢"; verdict_txt = "強勢開盤"
         strength = "🚀 台股記憶體今日有望走強！鎧俠已站上早盤最大量價"
     else:
-        verdict_emoji = "🔴"
-        verdict_txt = "弱勢開盤"
+        verdict_emoji = "🔴"; verdict_txt = "弱勢開盤"
         strength = "⚠️ 台股記憶體今日恐承壓，鎧俠跌破早盤最大量價"
+
+    # vs 昨收（用戶直覺）
+    prev_line = ""
+    if prev_close and prev_close > 0:
+        pd_diff = cur["price"] - prev_close
+        pd_pct = pd_diff / prev_close * 100
+        prev_emoji = "🟢" if pd_pct >= 0 else "🔴"
+        prev_line = f"vs 昨收 {prev_close:.0f}：{'+' if pd_diff>=0 else ''}{pd_diff:.0f} 円（{prev_emoji} {pd_pct:+.2f}%）"
 
     verdict = {
         "current_price": cur["price"], "current_time": cur["time"],
         "bench_price": bench_price, "diff": diff, "diff_pct": round(diff_pct, 2),
-        "text": verdict_txt,
+        "prev_close": prev_close, "text": verdict_txt,
     }
     save(today, bench, verdict)
 
-    # 台股記憶體對照持股（讓您知道對哪支股影響最大）
     tw_mem_stocks = ["2408 南亞科", "3529 力旺", "2451 創見", "3006 晶豪科",
                      "5351 鈺創", "3260 威剛", "8074 華景電", "8271 宇瞻"]
 
+    now_hm = datetime.now().strftime("%H:%M")
     lines = [
         f"🇯🇵 <b>鎧俠 Kioxia 領先指標</b> ({today})",
         f"<i>台股記憶體族群早盤先行指標</i>",
         "",
+        f"⏱ <b>訊息產出時間</b>：{now_hm}",
+        f"📊 <b>資料時間</b>：{cur['time']}（yfinance 有 15-30 分鐘延遲）",
+        f"⚠️ <i>實際即時價請點下方 TradingView 連結確認</i>",
+        "",
         f"📌 <b>08:00-08:30 最大量 bar</b>",
         f"  ⏱ {bench['time'][-5:]}｜量 <b>{bench['volume']:,}</b> 股",
         f"  💰 收 <b>{bench['close']:.0f}</b> ／ 高 {bench['high']:.0f} ／ 低 {bench['low']:.0f}",
-        f"  <i>（此為今日開盤強弱判定基準價）</i>",
         "",
-        f"📈 <b>現價 {cur['time']}</b>：<b>{cur['price']:.0f}</b>",
-        f"     差幅：{'+' if diff>=0 else ''}{diff:.0f} 円（{diff_pct:+.2f}%）",
+        f"📈 <b>{cur['time']} 時價</b>：<b>{cur['price']:.0f}</b>",
+        f"     vs 早盤量價 {bench_price:.0f}：{'+' if diff>=0 else ''}{diff:.0f} 円（{diff_pct:+.2f}%）",
+    ]
+    if prev_line:
+        lines.append(f"     {prev_line}")
+    lines.extend([
         "",
-        f"{verdict_emoji} <b>今日判定：{verdict_txt}</b>",
+        f"{verdict_emoji} <b>早盤判定：{verdict_txt}</b>",
         f"  {strength}",
+        f"  <i>（此為 09:00 分析當下狀態，之後可能反轉）</i>",
         "",
         f"💡 <b>台股記憶體對應觀察股</b>",
         f"  {' / '.join(tw_mem_stocks[:6])}",
         "",
-        f"📊 <b>Kioxia 1 分 K 圖表</b>",
-    ]
+        f"📊 <b>Kioxia 即時 1 分 K</b>",
+    ])
     for label, url in CHART_URLS.items():
         lines.append(f"  🔗 <a href='{url}'>{label}</a>")
 
