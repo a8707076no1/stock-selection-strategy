@@ -71,23 +71,23 @@ def parse_title_date(title):
 
 def extract_guest(title):
     """從 title 抽當集來賓（排除主持人）"""
-    # 常見 pattern：「｜李兆華、蔡明翰 2026.08.18 part1」
-    m = re.search(r"｜([^｜]+?)\s*20\d{6}", title)
+    # 「｜李兆華、蔡明翰 2026.08.18 part1」→ 抽「蔡明翰」
+    m = re.search(r"｜([^｜]+?)(?:\s*20\d{2}[.\-/]\d)", title)
     if not m:
         m = re.search(r"｜([^｜]+?)$", title)
     if not m:
         return None
     names_str = m.group(1)
-    # 拆多位來賓
+    # 去掉日期/part 尾巴
+    names_str = re.sub(r"\s*20\d{2}[.\-/]?\d.*$", "", names_str).strip()
     names = re.split(r"[、,，/]", names_str)
     for n in names:
         n = n.strip()
         if n and n != HOST and n in KNOWN_GUESTS:
             return n
-    # 沒對到 known → 回第一個非主持人
     for n in names:
         n = n.strip()
-        if n and n != HOST:
+        if n and n != HOST and re.match(r"^[一-鿿]{2,4}$", n):
             return n
     return None
 
@@ -170,17 +170,21 @@ def extract_key_points(transcript, guest):
         "warn_notes": [], "key_quotes": [],
     }
 
-    # 1. 抽個股：找 (4 位數字) 或 名稱後跟 (數字)
+    # 1. 抽個股：4 位數字 + 常見股名（whisper 常轉錯漏字，用寬 pattern）
     stock_pattern = re.compile(r"(?:^|[^0-9])(\d{4})(?![0-9])")
     stocks_count = {}
     for m in stock_pattern.finditer(transcript):
         sid = m.group(1)
-        # 濾非合理股號範圍
-        if 1000 <= int(sid) <= 9999:
+        n = int(sid)
+        # 台股股號範圍 1000-9999 但 4 開頭多是興櫃 or 電子業
+        if 1000 <= n <= 9999:
             stocks_count[sid] = stocks_count.get(sid, 0) + 1
-    # top 10 提及股（不含只提 1 次的，可能是誤中）
-    top_stocks = sorted([(s, c) for s, c in stocks_count.items() if c >= 2],
-                       key=lambda x: -x[1])[:15]
+    # 排除年份 2020-2030 / 常見金額（如 3000/5000/10000）
+    for exclude in ["2024","2025","2026","2027","2028","2029","2030","1000","2000","3000","5000"]:
+        stocks_count.pop(exclude, None)
+    # 允許提及 1 次（15 分鐘短節目提股不頻繁）
+    top_stocks = sorted([(s, c) for s, c in stocks_count.items() if c >= 1],
+                       key=lambda x: -x[1])[:20]
     result["stocks_mentioned"] = [{"sid": s, "mentions": c} for s, c in top_stocks]
 
     # 2. 抽族群
@@ -202,44 +206,38 @@ def extract_key_points(transcript, guest):
             result["sectors"].append({"name": sect, "mentions": total})
     result["sectors"].sort(key=lambda x: -x["mentions"])
 
+    # Whisper 轉錄逗號少，用「，」和空白也當句界
+    sents = re.split(r"[。！？，\n]", transcript)
+    sents = [s.strip() for s in sents if 8 < len(s.strip()) < 250]
+
     # 3. 技術分析段落
-    tech_patterns = [
-        r"[^。\n]*(?:月線|季線|年線|MA20|MA60|支撐|壓力|突破|跌破|站上|回測|反轉)[^。\n]{5,60}[。\n]",
-        r"[^。\n]*(?:目標價|上看|喊到|上攻|下探)[^。\n]{5,60}[。\n]",
-        r"[^。\n]*(?:多方|空方|翻多|翻空|轉強|轉弱)[^。\n]{5,60}[。\n]",
-    ]
+    tech_kws = ["月線","季線","年線","MA20","MA60","支撐","壓力","突破","跌破",
+                "站上","回測","反轉","目標價","上看","喊到","上攻","下探",
+                "多方","空方","翻多","翻空","轉強","轉弱","黃金交叉","死亡交叉"]
     tech_found = set()
-    for pat in tech_patterns:
-        for m in re.findall(pat, transcript)[:8]:
-            m = m.strip()
-            if 15 < len(m) < 150 and m not in tech_found:
-                tech_found.add(m)
-                result["technical_notes"].append(m)
-    result["technical_notes"] = result["technical_notes"][:8]
+    for s in sents:
+        if any(k in s for k in tech_kws):
+            if s not in tech_found:
+                tech_found.add(s)
+                result["technical_notes"].append(s)
+        if len(result["technical_notes"]) >= 10: break
 
     # 4. 看好訊號
-    buy_patterns = [
-        r"[^。\n]*(?:看好|買進|布局|建議|鎖定|留意|注意|強勢|標的|冠軍)[^。\n]{5,60}[。\n]",
-    ]
-    buy_found = set()
-    for pat in buy_patterns:
-        for m in re.findall(pat, transcript)[:8]:
-            m = m.strip()
-            if 15 < len(m) < 150 and m not in buy_found:
-                buy_found.add(m)
-                result["buy_signals"].append(m)
-    result["buy_signals"] = result["buy_signals"][:5]
+    buy_kws = ["看好","買進","布局","建議","鎖定","留意","強勢","標的","冠軍",
+               "加碼","逢低","進場","中長期"]
+    for s in sents:
+        if any(k in s for k in buy_kws):
+            if s not in result["buy_signals"]:
+                result["buy_signals"].append(s)
+        if len(result["buy_signals"]) >= 8: break
 
     # 5. 警示
-    warn_patterns = [
-        r"[^。\n]*(?:小心|注意風險|不要追|停損|獲利了結|賣點|見高|過熱)[^。\n]{5,60}[。\n]",
-    ]
-    for pat in warn_patterns:
-        for m in re.findall(pat, transcript)[:5]:
-            m = m.strip()
-            if 15 < len(m) < 150:
-                result["warn_notes"].append(m)
-    result["warn_notes"] = result["warn_notes"][:5]
+    warn_kws = ["小心","注意風險","不要追","停損","獲利了結","賣點","見高","過熱",
+                "獲利出場","減碼","停利","反壓"]
+    for s in sents:
+        if any(k in s for k in warn_kws):
+            result["warn_notes"].append(s)
+        if len(result["warn_notes"]) >= 6: break
 
     # 6. 金句
     quote_patterns = [
@@ -335,6 +333,24 @@ def append_to_docx(date_str, parts_data, name_map=None):
             doc.add_paragraph("💬 金句：", style="Intense Quote")
             for q in info["key_quotes"][:3]:
                 doc.add_paragraph(f"  「{q}」", style="Quote")
+
+        # ★ 完整逐字稿（讓用戶自己讀，補 regex 抽不到的漏網之魚）
+        if info.get("transcript"):
+            doc.add_paragraph("📝 完整逐字稿：", style="Intense Quote")
+            # 分段：每 3 個「，」or「。」斷一次，方便閱讀
+            tx = info["transcript"]
+            # 每 200 字換行
+            paras = []
+            cur = ""
+            for line in tx.split("\n"):
+                line = line.strip()
+                if not line: continue
+                cur += line + "。"
+                if len(cur) > 200:
+                    paras.append(cur); cur = ""
+            if cur: paras.append(cur)
+            for pa in paras:
+                doc.add_paragraph(pa)
 
         doc.add_paragraph()   # 空一行
 
@@ -487,16 +503,21 @@ def main():
         if not audio:
             log(f"  ❌ 下載失敗，跳過")
             continue
-        transcript = transcribe(audio)
-        if not transcript:
-            log(f"  ❌ 轉錄失敗"); continue
+        # 若本地已有轉錄檔就跳 whisper（省時間）
+        tx_path = os.path.join(LOG_DIR, f"financial_expert_{date_str}_part{p['part']}_{vid}.txt")
+        if os.path.exists(tx_path) and os.path.getsize(tx_path) > 500:
+            transcript = open(tx_path, encoding="utf-8").read()
+            log(f"  ⏭️  用已存在轉錄檔 ({len(transcript)} 字)")
+        else:
+            transcript = transcribe(audio)
+            if not transcript:
+                log(f"  ❌ 轉錄失敗"); continue
+            with open(tx_path, "w", encoding="utf-8") as f:
+                f.write(transcript)
         info = extract_key_points(transcript, p.get("guest"))
+        info["transcript"] = transcript   # ★ 完整轉錄也帶著
         log(f"  📊 族群 {len(info['sectors'])} / 個股 {len(info['stocks_mentioned'])} / "
             f"技術 {len(info['technical_notes'])} / 看好 {len(info['buy_signals'])}")
-        # 存全文（給日後查閱）
-        tx_path = os.path.join(LOG_DIR, f"financial_expert_{date_str}_part{p['part']}_{vid}.txt")
-        with open(tx_path, "w", encoding="utf-8") as f:
-            f.write(transcript)
         p["info"] = info
         parts_data.append(p)
 
