@@ -500,7 +500,7 @@ SUBSECTORS["_未分類"] = {"parent": "其他", "alias": "未分類", "icon": "�
 # ─────────────────────────────────────────────────────────────
 def fetch_all_industries(force=False):
     """從 TWSE/TPEX 抓全部公司產業別，回傳 {sid: {industry, sector, market, name}}"""
-    cache_path = os.path.expanduser("~/Desktop/Stock Selection Strategy/cache/stock_industry.json")
+    cache_path = os.path.join((os.environ.get("STOCK_BASE_DIR") or os.path.expanduser("~/Desktop/Stock Selection Strategy")), "cache", "stock_industry.json")
     if not force and os.path.exists(cache_path):
         try:
             with open(cache_path) as f:
