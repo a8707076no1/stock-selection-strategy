@@ -141,16 +141,19 @@ def download_audio(vid):
     for f_ in os.listdir(TMP_DIR):
         if f_.startswith(vid):
             os.remove(os.path.join(TMP_DIR, f_))
-    subprocess.run(
-        ["yt-dlp", "-x", "--audio-format", "mp3", "--audio-quality", "5",
-         "--no-warnings", "-o", os.path.join(TMP_DIR, f"{vid}.%(ext)s"),
-         f"https://www.youtube.com/watch?v={vid}"],
-        capture_output=True, timeout=300, check=False,
-    )
-    if os.path.exists(audio_path):
-        sz = os.path.getsize(audio_path) / (1024*1024)
-        log(f"  ✅ 音訊 {sz:.1f} MB")
-        return audio_path
+    for client in ["mweb", "tv", "android_music", "web_safari"]:
+        r = subprocess.run(
+            ["yt-dlp", "-x", "--audio-format", "mp3", "--audio-quality", "5",
+             "--no-warnings", "--extractor-args", f"youtube:player_client={client}",
+             "-o", os.path.join(TMP_DIR, f"{vid}.%(ext)s"),
+             f"https://www.youtube.com/watch?v={vid}"],
+            capture_output=True, timeout=300, check=False, text=True,
+        )
+        if os.path.exists(audio_path) and os.path.getsize(audio_path) > 100_000:
+            sz = os.path.getsize(audio_path) / (1024*1024)
+            log(f"  ✅ 音訊 {sz:.1f} MB (client={client})")
+            return audio_path
+        log(f"  ⚠️ client={client} 失敗")
     return None
 
 

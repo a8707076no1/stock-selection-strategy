@@ -120,16 +120,21 @@ def download_audio(vid):
     log(f"  📥 下載音訊 {vid}...")
     for f in os.listdir(TMP_DIR):
         if f.startswith(vid): os.remove(os.path.join(TMP_DIR, f))
-    subprocess.run(
-        ["yt-dlp", "-x", "--audio-format", "mp3", "--audio-quality", "5", "--no-warnings",
-         "-o", os.path.join(TMP_DIR, f"{vid}.%(ext)s"),
-         f"https://www.youtube.com/watch?v={vid}"],
-        capture_output=True, timeout=300, check=False,
-    )
-    if os.path.exists(audio_path):
-        sz = os.path.getsize(audio_path) / (1024*1024)
-        log(f"  ✅ 音訊 {sz:.1f} MB")
-        return audio_path
+    # 多 client fallback（2026 起 YouTube 反爬蟲，需嘗試多個 player_client）
+    for client in ["mweb", "tv", "android_music", "web_safari"]:
+        r = subprocess.run(
+            ["yt-dlp", "-x", "--audio-format", "mp3", "--audio-quality", "5", "--no-warnings",
+             "--extractor-args", f"youtube:player_client={client}",
+             "-o", os.path.join(TMP_DIR, f"{vid}.%(ext)s"),
+             f"https://www.youtube.com/watch?v={vid}"],
+            capture_output=True, timeout=300, check=False, text=True,
+        )
+        if os.path.exists(audio_path) and os.path.getsize(audio_path) > 100_000:
+            sz = os.path.getsize(audio_path) / (1024*1024)
+            log(f"  ✅ 音訊 {sz:.1f} MB（client={client}）")
+            return audio_path
+        log(f"  ⚠️ client={client} 失敗：{(r.stderr or r.stdout or '')[-200:]}")
+    log(f"  ❌ 所有 client 都失敗")
     return None
 
 

@@ -68,23 +68,74 @@ def main():
         print(f"✅ HealthCheck {ymd} PASS：所有區塊皆有資料")
         return
 
-    # 有問題 → 送 alert
+    # 🔧 自動診斷 + 嘗試補救（remediation）
+    import subprocess
+    remediation_done = []
+    for i in issues:
+        key = i["key"]
+        cmd = None
+        if key in ("flash", "breakouts", "pullbacks"):
+            cmd = "python taiwan_stock_screener_v3.py && python generate_chart.py"
+        elif key == "sector":
+            # sector 空可能是 regex bug or generate_daily_summary 沒跑
+            cmd = "python generate_daily_summary.py"
+        elif key == "holdings":
+            # 持股空 = xlsx 沒下載到 or holdings_loader fail
+            cmd = "ls -la 資產與持股明細更新案夾/ && python generate_chart.py && python generate_daily_summary.py"
+        elif key == "merger":
+            cmd = "python merger_news_scanner.py && python generate_chart.py && python generate_daily_summary.py"
+        if cmd and cmd not in [r["cmd"] for r in remediation_done]:
+            print(f"🔧 auto-remediation for {i['label']}: {cmd}")
+            r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=1200)
+            remediation_done.append({
+                "cmd": cmd, "key": key, "label": i["label"],
+                "ok": r.returncode == 0,
+                "out": (r.stdout or "")[-500:],
+            })
+
+    # 重新讀 summary
+    d2 = json.load(open(summary_path, encoding="utf-8")) if os.path.exists(summary_path) else d
+    remaining = []
+    for i in issues:
+        section = d2.get(i["key"]) or {}
+        if EXPECTED[i["key"]].get("detail_field"):
+            n = len(section.get(EXPECTED[i["key"]]["detail_field"]) or [])
+        else:
+            n = section.get("count", 0)
+        if n < i["expected"]:
+            remaining.append({**i, "final": n})
+        else:
+            print(f"✅ {i['label']} 已修復（{i['actual']} → {n}）")
+
+    if not remaining:
+        # 全部 auto-fix 成功，只推「已修復」訊息（不當 error）
+        msg = f"✅ Pipeline HealthCheck 自動修復\n📅 {ymd}\n"
+        for r in remediation_done:
+            msg += f"🔧 {r['label']} 補跑{'成功' if r['ok'] else '失敗'}\n"
+        send_tg(msg)
+        return
+
+    # 仍有空缺 → alert（含已嘗試 auto-fix 資訊）
     lines = [
         f"🚨 <b>Pipeline HealthCheck 警示</b>",
         f"📅 資料日 {ymd}",
-        f"⚠️ 發現 {len(issues)} 個區塊異常空缺：",
+        f"⚠️ 發現 {len(remaining)} 個區塊異常空缺（已嘗試 auto-fix 但無效）：",
         "",
     ]
-    for i in issues:
-        lines.append(f"❌ <b>{i['label']}</b>：{i['actual']} 支（期望 ≥{i['expected']}）")
+    for i in remaining:
+        lines.append(f"❌ <b>{i['label']}</b>：{i['final']} 支（期望 ≥{i['expected']}）")
         lines.append(f"   💡 {i['hint']}")
+    lines.append("")
+    lines.append("<i>已嘗試 auto-fix：</i>")
+    for r in remediation_done:
+        status = "✅" if r["ok"] else "❌"
+        lines.append(f"  {status} {r['label']}")
     lines.append("")
     lines.append("<i>請盡快檢查 pipeline log</i>")
     lines.append(f"<i>https://stock-selection.pages.dev/</i>")
 
     send_tg("\n".join(lines))
     print("\n".join(lines))
-    # exit code non-zero 讓 workflow 標示為 partial success
     sys.exit(1)
 
 
