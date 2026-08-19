@@ -198,6 +198,14 @@
 <div class="section-divider">📡 即時分析</div>
 
 <div class="external-list">
+  <a class="external-item" href="#" onclick="event.preventDefault(); openFinancialExpert()">
+    <div class="icon">📺</div>
+    <div class="info">
+      <div class="title">理財達人秀 每日重點</div>
+      <div class="sub" id="feSub">3 位來賓分析 · 每晚 21:15 更新</div>
+    </div>
+    <div class="arrow">›</div>
+  </a>
   <a class="external-item" href="https://t.me/my_finance978_bot" target="_blank">
     <div class="icon">💬</div>
     <div class="info">
@@ -650,6 +658,74 @@ async function render() {
   currentDate = dates[0];
   renderTodayLine(dates[0]);
   render();
+})();
+
+// ─── 理財達人秀 Modal ───
+async function openFinancialExpert() {
+  let fe = null;
+  try {
+    const r = await fetch(`/financial_expert_latest.json?t=${Date.now()}`, { cache: "no-store" });
+    if (r.ok && (r.headers.get("content-type") || "").includes("json")) {
+      fe = await r.json();
+    }
+  } catch {}
+  document.getElementById("modalIcon").textContent = "📺";
+  document.getElementById("modalTitle").textContent = fe ? `理財達人秀 ${fe.date}` : "理財達人秀";
+  document.getElementById("modalOpenChart").style.display = "none";
+
+  const acc = "#e67e22";
+  let html;
+  if (!fe || !fe.parts || !fe.parts.length) {
+    html = `<div class="modal-empty">
+      尚無資料<br><br>
+      每個工作日 21:15 自動抓 3 位來賓分析<br>
+      <span style="color:#8b949e;font-size:11px">頻道：@EBCmoneyshow</span>
+    </div>`;
+  } else {
+    html = `<div style="color:#adbac7;font-size:12px;margin-bottom:12px">
+      📅 ${fe.date}｜3 位來賓分析（點來賓看細節）
+    </div>`;
+    for (const p of fe.parts) {
+      const info = p.info || {};
+      const sectors = (info.sectors || []).slice(0, 3).map(s => `${s.name}(${s.mentions})`).join(" · ");
+      const stocks  = (info.stocks_mentioned || []).slice(0, 6).map(s => {
+        const nm = s.name ? ` ${s.name}` : "";
+        return `<b>${s.sid}</b>${nm}(${s.mentions})`;
+      }).join(" · ");
+      const techLines = (info.technical_notes || []).slice(0, 3).map(t => `<div style="font-size:11px;color:#adbac7;margin:3px 0">▸ ${t}</div>`).join("");
+      const buyLines  = (info.buy_signals || []).slice(0, 2).map(b => `<div style="font-size:11px;color:#3fb950;margin:3px 0">🚀 ${b}</div>`).join("");
+      const warnLines = (info.warn_notes || []).slice(0, 2).map(w => `<div style="font-size:11px;color:#f0a500;margin:3px 0">⚠️ ${w}</div>`).join("");
+      html += `<div class="stock-item" style="--sa:${acc}">
+        <div class="r1">
+          <div><span class="sid">Part ${p.part}</span><span class="name">${p.guest || "未知"}</span></div>
+          <a href="${p.url}" target="_blank" style="color:#58a6ff;font-size:12px;text-decoration:none">▶ 原片</a>
+        </div>
+        ${sectors ? `<div style="margin-top:6px;font-size:11px"><span style="color:#8b949e">📊 族群：</span><span style="color:#fff">${sectors}</span></div>` : ""}
+        ${stocks ? `<div style="margin-top:4px;font-size:11px"><span style="color:#8b949e">🎯 個股：</span><span style="color:#fff">${stocks}</span></div>` : ""}
+        ${techLines ? `<div style="margin-top:6px"><span style="color:#8b949e;font-size:11px">📐 技術重點</span>${techLines}</div>` : ""}
+        ${buyLines}
+        ${warnLines}
+      </div>`;
+    }
+  }
+  document.getElementById("modalBody").innerHTML = html;
+  document.getElementById("modalOverlay").classList.add("on");
+  requestAnimationFrame(() => document.getElementById("modalSheet").classList.add("on"));
+  document.body.style.overflow = "hidden";
+  // 恢復 modalOpenChart 讓其他 tile 用
+  setTimeout(() => { document.getElementById("modalOpenChart").style.display = "block"; }, 500);
+}
+
+// 首頁載入時檢查有沒有理財達人秀資料，更新 sub text
+(async () => {
+  try {
+    const r = await fetch(`/financial_expert_latest.json?t=${Date.now()}`, { cache: "no-store" });
+    if (r.ok && (r.headers.get("content-type") || "").includes("json")) {
+      const fe = await r.json();
+      const el = document.getElementById("feSub");
+      if (el && fe.date) el.textContent = `${fe.date}｜${(fe.parts||[]).length} 位來賓`;
+    }
+  } catch {}
 })();
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
