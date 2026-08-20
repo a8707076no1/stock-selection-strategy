@@ -26,7 +26,7 @@ CACHE = os.path.join(BASE, "cache")
 NEWS_CACHE = os.path.join(CACHE, "stock_news.json")
 MA_CACHE   = os.path.join(CACHE, "merger_news.json")
 
-# 主動搜這些 query
+# 主動搜這些 query（覆蓋更廣）
 QUERIES = [
     "台股 併購",
     "上市公司 收購",
@@ -40,6 +40,22 @@ QUERIES = [
     "私有化 台灣",
     "海外併購 台灣",
     "策略入股 上市",
+    "重大訊息 收購",
+    "重大訊息 併購",
+    "取得100% 股權",
+    "整併 台股",
+    "借殼 上市",
+    "資產收購 台股",
+    "子公司併購",
+    "收購案 溢價",
+    "台股 買下",
+    "宣布收購 台股",
+    "同意收購 台股",
+    "台廠 併購",
+    "台商 收購",
+    "上市公司 買下",
+    "決議 收購",
+    "投資契約 收購",
 ]
 
 MA_KEYWORDS = [
@@ -202,6 +218,20 @@ def main():
                 })
         time.sleep(1.5)
 
+    # ★ 讀舊 merger_news 保留過去 N 天 rolling（避免這輪 query 沒 hit 就消失）
+    if os.path.exists(MA_CACHE):
+        try:
+            old = json.load(open(MA_CACHE))
+            for sid, hits_old in (old.get("by_sid") or {}).items():
+                for h in hits_old:
+                    # 過濾超過 cutoff 的舊 news
+                    dt_str = h.get("date","")
+                    try:
+                        dt = datetime.strptime(dt_str, "%Y-%m-%d")
+                        if dt < cutoff: continue
+                    except: continue
+                    all_hits.append(h)
+        except: pass
     # 去重 by (sid, url)
     unique = {}
     for h in all_hits:
