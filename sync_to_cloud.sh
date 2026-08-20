@@ -30,6 +30,13 @@ log "  ✅ 新複製/更新 $count 個檔案"
 log "📊 產生 summary.json..."
 "$PY" generate_daily_summary.py >> "$LOG" 2>&1
 
+# 2b. 清理超過 7 天的 financial_expert JSON（只保最近 7 個工作日）
+log "🧹 清理 7 天前的 financial_expert JSON..."
+find "$BASE/web" -maxdepth 1 -name "financial_expert_*.json" -not -name "financial_expert_latest.json" -mtime +9 -delete 2>/dev/null
+# 也清 7 天前的 chart html/summary
+find "$BASE/web" -maxdepth 1 -name "飆股圖表_*.html" -mtime +9 -delete 2>/dev/null
+find "$BASE/web" -maxdepth 1 -name "summary_*.json" -mtime +9 -delete 2>/dev/null
+
 # 3. 部署到 Cloudflare Pages
 log "☁️  部署 Cloudflare Pages..."
 DEPLOY_URL=$(wrangler pages deploy web --project-name=stock-selection --commit-dirty=true 2>&1 | grep -oE "https://[a-z0-9-]+\.stock-selection\.pages\.dev" | tail -1)

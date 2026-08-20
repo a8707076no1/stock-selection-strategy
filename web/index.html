@@ -661,58 +661,118 @@ async function render() {
 })();
 
 // ─── 理財達人秀 Modal ───
-async function openFinancialExpert() {
-  let fe = null;
-  try {
-    const r = await fetch(`/financial_expert_latest.json?t=${Date.now()}`, { cache: "no-store" });
-    if (r.ok && (r.headers.get("content-type") || "").includes("json")) {
-      fe = await r.json();
-    }
-  } catch {}
-  document.getElementById("modalIcon").textContent = "📺";
-  document.getElementById("modalTitle").textContent = fe ? `理財達人秀 ${fe.date}` : "理財達人秀";
-  document.getElementById("modalOpenChart").style.display = "none";
+async function detectFinancialExpertDates() {
+  // 掃過去 10 天工作日，回存在的 JSON
+  const list = [];
+  const today = new Date();
+  for (let i = 0; i < 10; i++) {
+    const d = new Date(today.getTime() - i * 86400000);
+    if (d.getDay() === 0 || d.getDay() === 6) continue;
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const dd = String(d.getDate()).padStart(2,"0");
+    const ymd = `${y}${m}${dd}`;
+    try {
+      const r = await fetch(`/financial_expert_${ymd}.json?t=${Date.now()}`, { cache: "no-store" });
+      if (r.ok && (r.headers.get("content-type") || "").includes("json")) {
+        const j = await r.json();
+        if (j && j.parts) list.push({ymd, data: j});
+      }
+    } catch {}
+    if (list.length >= 7) break;   // 只保 7 天
+  }
+  return list;
+}
 
+function feDateStr(ymd) {
+  const y = ymd.slice(0,4), m = ymd.slice(4,6), d = ymd.slice(6,8);
+  const dt = new Date(`${y}-${m}-${d}`);
+  const dow = ["日","一","二","三","四","五","六"][dt.getDay()];
+  return `${m}/${d}（週${dow}）`;
+}
+
+function feRenderMDbold(txt) {
+  // markdown **粗** → <b>
+  return txt.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+}
+
+function feEscape(s) {
+  return String(s||"").replace(/[<>&]/g, c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+}
+
+let _feDates = [];
+
+function feRender(ymd) {
+  const entry = _feDates.find(x => x.ymd === ymd);
+  if (!entry) return;
+  const fe = entry.data;
   const acc = "#e67e22";
-  let html;
-  if (!fe || !fe.parts || !fe.parts.length) {
-    html = `<div class="modal-empty">
+  document.getElementById("modalTitle").textContent = `理財達人秀 ${feDateStr(ymd)}`;
+
+  let html = `<div style="margin-bottom:12px">
+    <select id="feDatePicker" onchange="feRender(this.value)"
+      style="background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:6px 10px;font-size:13px;width:100%">
+      ${_feDates.map(x => `<option value="${x.ymd}"${x.ymd===ymd?' selected':''}>${feDateStr(x.ymd)}${x===_feDates[0]?' · 最新':''}</option>`).join('')}
+    </select>
+    <div style="font-size:10px;color:#8b949e;margin-top:4px">保留最近 7 個工作日，過期自動刪除</div>
+  </div>`;
+
+  for (const p of fe.parts) {
+    const info = p.info || {};
+    // AI 深度摘要
+    const summary = info.ai_summary || [];
+    const summaryHTML = summary.length ? `<div style="margin-top:8px">
+      <div style="color:#f0a500;font-size:12px;font-weight:bold;margin-bottom:4px">🤖 深度重點</div>
+      ${summary.map(s => `<div style="font-size:11px;color:#e0e6f0;margin:5px 0;line-height:1.5">▸ ${feRenderMDbold(feEscape(s)).replace(/&lt;b&gt;/g,'<b>').replace(/&lt;\/b&gt;/g,'</b>')}</div>`).join('')}
+    </div>` : '';
+
+    // 個股操作建議表
+    const ops = info.stock_operations || [];
+    const opsHTML = ops.length ? `<div style="margin-top:10px">
+      <div style="color:#3fb950;font-size:12px;font-weight:bold;margin-bottom:4px">🎯 個股操作建議</div>
+      ${ops.map(op => {
+        const acolor = op.action?.startsWith("🟢") ? "#3fb950" :
+                      op.action?.startsWith("🟡") ? "#f0c040" :
+                      op.action?.startsWith("⚠️") ? "#f0a500" : "#8b949e";
+        return `<div style="background:rgba(255,255,255,0.03);border-left:3px solid ${acolor};padding:6px 10px;margin:4px 0;border-radius:6px">
+          <div style="font-size:12px"><b style="color:#fff">${op.sid}</b> <span style="color:#adbac7">${op.name||''}</span> · <span style="color:${acolor}">${op.action||''}</span></div>
+          ${op.note ? `<div style="font-size:10px;color:#8b949e;margin-top:3px;line-height:1.4">${feEscape(op.note)}</div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>` : '';
+
+    html += `<div class="stock-item" style="--sa:${acc};padding-bottom:12px">
+      <div class="r1">
+        <div><span class="sid">Part ${p.part}</span><span class="name">${p.guest || "未知"}</span></div>
+        <a href="${p.url}" target="_blank" style="color:#58a6ff;font-size:12px;text-decoration:none">▶ 原片</a>
+      </div>
+      ${p.topic ? `<div style="font-size:11px;color:#adbac7;margin-top:4px">${feEscape(p.topic)}</div>` : ''}
+      ${summaryHTML}
+      ${opsHTML}
+    </div>`;
+  }
+  document.getElementById("modalBody").innerHTML = html;
+}
+
+async function openFinancialExpert() {
+  document.getElementById("modalIcon").textContent = "📺";
+  document.getElementById("modalTitle").textContent = "理財達人秀（載入中...）";
+  document.getElementById("modalOpenChart").style.display = "none";
+  document.getElementById("modalBody").innerHTML = `<div class="modal-empty">載入中...</div>`;
+  document.getElementById("modalOverlay").classList.add("on");
+  requestAnimationFrame(() => document.getElementById("modalSheet").classList.add("on"));
+  document.body.style.overflow = "hidden";
+
+  _feDates = await detectFinancialExpertDates();
+  if (!_feDates.length) {
+    document.getElementById("modalBody").innerHTML = `<div class="modal-empty">
       尚無資料<br><br>
       每個工作日 21:15 自動抓 3 位來賓分析<br>
       <span style="color:#8b949e;font-size:11px">頻道：@EBCmoneyshow</span>
     </div>`;
   } else {
-    html = `<div style="color:#adbac7;font-size:12px;margin-bottom:12px">
-      📅 ${fe.date}｜3 位來賓分析（點來賓看細節）
-    </div>`;
-    for (const p of fe.parts) {
-      const info = p.info || {};
-      const sectors = (info.sectors || []).slice(0, 3).map(s => `${s.name}(${s.mentions})`).join(" · ");
-      const stocks  = (info.stocks_mentioned || []).slice(0, 6).map(s => {
-        const nm = s.name ? ` ${s.name}` : "";
-        return `<b>${s.sid}</b>${nm}(${s.mentions})`;
-      }).join(" · ");
-      const techLines = (info.technical_notes || []).slice(0, 3).map(t => `<div style="font-size:11px;color:#adbac7;margin:3px 0">▸ ${t}</div>`).join("");
-      const buyLines  = (info.buy_signals || []).slice(0, 2).map(b => `<div style="font-size:11px;color:#3fb950;margin:3px 0">🚀 ${b}</div>`).join("");
-      const warnLines = (info.warn_notes || []).slice(0, 2).map(w => `<div style="font-size:11px;color:#f0a500;margin:3px 0">⚠️ ${w}</div>`).join("");
-      html += `<div class="stock-item" style="--sa:${acc}">
-        <div class="r1">
-          <div><span class="sid">Part ${p.part}</span><span class="name">${p.guest || "未知"}</span></div>
-          <a href="${p.url}" target="_blank" style="color:#58a6ff;font-size:12px;text-decoration:none">▶ 原片</a>
-        </div>
-        ${sectors ? `<div style="margin-top:6px;font-size:11px"><span style="color:#8b949e">📊 族群：</span><span style="color:#fff">${sectors}</span></div>` : ""}
-        ${stocks ? `<div style="margin-top:4px;font-size:11px"><span style="color:#8b949e">🎯 個股：</span><span style="color:#fff">${stocks}</span></div>` : ""}
-        ${techLines ? `<div style="margin-top:6px"><span style="color:#8b949e;font-size:11px">📐 技術重點</span>${techLines}</div>` : ""}
-        ${buyLines}
-        ${warnLines}
-      </div>`;
-    }
+    feRender(_feDates[0].ymd);
   }
-  document.getElementById("modalBody").innerHTML = html;
-  document.getElementById("modalOverlay").classList.add("on");
-  requestAnimationFrame(() => document.getElementById("modalSheet").classList.add("on"));
-  document.body.style.overflow = "hidden";
-  // 恢復 modalOpenChart 讓其他 tile 用
   setTimeout(() => { document.getElementById("modalOpenChart").style.display = "block"; }, 500);
 }
 
