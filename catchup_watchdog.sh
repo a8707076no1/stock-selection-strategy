@@ -135,6 +135,37 @@ while true; do
     check_lin_hanwei postmarket lin_hanwei_postmarket_history.json 盤後解盤
   fi
 
+  # ── 1.6 理財達人秀（平日 21:15 之後，開機後補跑）──
+  if [ "$WDAY" -ge "1" ] && [ "$WDAY" -le "5" ] && [ "$HM" -ge "2115" ]; then
+    HPATH="$BASE/cache/financial_expert_history.json"
+    NEED_RUN=1
+    if [ -f "$HPATH" ]; then
+      # 檢查 history[TODAY_DASH] 是否存在
+      if grep -q "\"$TODAY\"" "$HPATH" 2>/dev/null; then
+        NEED_RUN=0
+      fi
+    fi
+    if [ "$NEED_RUN" = "1" ]; then
+      log "⚠️ 理財達人秀 $TODAY 未處理，啟動抓取"
+      "$PY" financial_expert_daily.py >> "$LOG" 2>&1 &
+    fi
+  fi
+  # 假日開機時檢查前一工作日是否漏抓（週六/日開機 → 補週五的）
+  if [ "$WDAY" -ge "6" ] || [ "$WDAY" = "7" ]; then
+    for i in 1 2 3; do
+      D=$(date -v-${i}d '+%Y%m%d')
+      WD=$(date -j -f "%Y%m%d" "$D" "+%u" 2>/dev/null)
+      [ "$WD" -ge "1" ] && [ "$WD" -le "5" ] || continue
+      HPATH="$BASE/cache/financial_expert_history.json"
+      if [ -f "$HPATH" ] && grep -q "\"$D\"" "$HPATH" 2>/dev/null; then
+        continue
+      fi
+      log "⚠️ 理財達人秀 補跑 $D（週末開機補漏）"
+      "$PY" financial_expert_daily.py --date $D >> "$LOG" 2>&1 &
+      break   # 一次補一日避免同時多支 Whisper 塞爆
+    done
+  fi
+
   # ── 2. 平日盤後（15:40 後檢查，移除 19:00 上限！）──
   if is_weekday && [ "$HM" -ge "1540" ]; then
     if [ ! -f "$BASE/飆股圖表_${TODAY}.html" ]; then
